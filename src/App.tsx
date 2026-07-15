@@ -9,7 +9,7 @@ import { TransferPanel } from './features/transfers/TransferPanel'
 import { readStoredTheme, storeTheme, type ThemeId } from './theme'
 import type { CloudFile } from './types/files'
 
-type ModalKind = 'settings' | 'upload' | 'vault' | null
+type ModalKind = 'settings' | 'theme' | 'upload' | 'vault' | null
 
 function App() {
   const [activeItem, setActiveItem] = useState('我的文件')
@@ -50,13 +50,14 @@ function App() {
           activeItem={activeItem}
           onSelect={selectNavigation}
           onSettingsClick={() => setModalKind('settings')}
+          onThemeClick={() => setModalKind('theme')}
           onVaultClick={() => setModalKind('vault')}
         />
         <FileWorkspace
           files={files}
           itemCount={itemCount}
           onCreateFolder={createFolder}
-          onThemeOpen={() => setModalKind('settings')}
+          onThemeOpen={() => setModalKind('theme')}
           onUpload={() => setModalKind('upload')}
         />
         <TransferPanel visible={transferVisible} onClose={() => setTransferVisible(false)} />
@@ -82,6 +83,12 @@ function App() {
       ) : null}
 
       {modalKind === 'settings' ? (
+        <Modal title="设置" actionLabel="知道了" onClose={() => setModalKind(null)}>
+          <p>应用设置界面将在后续迭代中接入。</p>
+        </Modal>
+      ) : null}
+
+      {modalKind === 'theme' ? (
         <Modal title="外观主题" actionLabel="完成" onClose={() => setModalKind(null)}>
           <ThemePicker value={themeId} onChange={selectTheme} />
         </Modal>

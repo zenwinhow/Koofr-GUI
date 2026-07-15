@@ -4,6 +4,7 @@ import {
   Folder,
   HelpCircle,
   LockKeyhole,
+  Palette,
   Settings,
   Share2,
   Trash2,
@@ -21,10 +22,11 @@ interface AppSidebarProps {
   activeItem: string
   onSelect: (label: string) => void
   onSettingsClick: () => void
+  onThemeClick: () => void
   onVaultClick: () => void
 }
 
-export function AppSidebar({ activeItem, onSelect, onSettingsClick, onVaultClick }: AppSidebarProps) {
+export function AppSidebar({ activeItem, onSelect, onSettingsClick, onThemeClick, onVaultClick }: AppSidebarProps) {
   return (
     <aside className="sidebar" aria-label="主导航">
       <div className="sidebar__brand">
@@ -66,6 +68,10 @@ export function AppSidebar({ activeItem, onSelect, onSettingsClick, onVaultClick
         <button className="upgrade-button" type="button">
           <Cloud size={17} />
           升级存储空间
+        </button>
+        <button className="footer-link" type="button" onClick={onThemeClick}>
+          <Palette size={17} />
+          皮肤
         </button>
         <button className="footer-link" type="button" onClick={onSettingsClick}>
           <Settings size={17} />
