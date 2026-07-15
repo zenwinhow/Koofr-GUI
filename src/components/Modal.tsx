@@ -7,9 +7,10 @@ interface ModalProps {
   actionLabel: string
   onClose: () => void
   onAction?: () => void
+  actionDisabled?: boolean
 }
 
-export function Modal({ title, children, actionLabel, onClose, onAction }: ModalProps) {
+export function Modal({ title, children, actionLabel, onClose, onAction, actionDisabled = false }: ModalProps) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -24,7 +25,7 @@ export function Modal({ title, children, actionLabel, onClose, onAction }: Modal
         </button>
         <h2 id="modal-title">{title}</h2>
         <div className="modal__content">{children}</div>
-        <button className="primary-button modal__action" type="button" onClick={onAction ?? onClose}>
+        <button className="primary-button modal__action" type="button" disabled={actionDisabled} onClick={onAction ?? onClose}>
           {actionLabel}
         </button>
       </section>

@@ -409,6 +409,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn maps_mount_list_request_and_response() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(GET)
+                    .path("/api/v2/mounts")
+                    .header("authorization", "Token token=test-token");
+                then.status(200).json_body(json!({
+                    "mounts": [{
+                        "id": "mount_1",
+                        "name": "Koofr",
+                        "type": "device",
+                        "spaceTotal": 1000,
+                        "spaceUsed": 250,
+                        "online": true,
+                        "isPrimary": true,
+                        "isShared": false
+                    }]
+                }));
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        let mounts = api.list_mounts().await.expect("list mounts");
+
+        mock.assert_async().await;
+        assert_eq!(mounts.len(), 1);
+        assert_eq!(mounts[0].id, "mount_1");
+        assert!(mounts[0].is_primary);
+        assert_eq!(mounts[0].space_used, 250);
+    }
+
+    #[tokio::test]
     async fn maps_list_files_request_and_response() {
         let server = MockServer::start_async().await;
         let mock = server

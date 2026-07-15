@@ -28,6 +28,12 @@ export function commandErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+export function isCommandErrorCode(error: unknown, code: CommandError['code']) {
+  return typeof error === 'object'
+    && error !== null
+    && (error as Partial<CommandError>).code === code
+}
+
 export const koofr = {
   connect(email: string, appPassword: string) {
     return invoke<KoofrSession>('connect_koofr', { email, appPassword })

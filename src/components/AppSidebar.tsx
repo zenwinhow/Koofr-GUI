@@ -1,5 +1,4 @@
 import {
-  Cloud,
   Clock3,
   Folder,
   HelpCircle,
@@ -10,6 +9,7 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react'
+import { formatBytes } from '../features/files/filePresentation'
 import { BrandMark } from './BrandMark'
 
 const primaryItems = [
@@ -26,6 +26,9 @@ interface AppSidebarProps {
   onThemeClick: () => void
   onVaultClick: () => void
   onLogoutClick: () => void
+  storageName: string
+  storageUsed: number | null
+  storageTotal: number | null
 }
 
 export function AppSidebar({
@@ -35,7 +38,14 @@ export function AppSidebar({
   onThemeClick,
   onVaultClick,
   onLogoutClick,
+  storageName,
+  storageUsed,
+  storageTotal,
 }: AppSidebarProps) {
+  const storagePercent = storageUsed !== null && storageTotal !== null && storageTotal > 0
+    ? Math.min(100, Math.max(0, (storageUsed / storageTotal) * 100))
+    : 0
+
   return (
     <aside className="sidebar" aria-label="主导航">
       <div className="sidebar__brand">
@@ -68,16 +78,16 @@ export function AppSidebar({
 
       <div className="sidebar__footer">
         <div className="storage">
-          <span>存储空间</span>
-          <small>已使用&nbsp; 12.4 GB / 50 GB</small>
-          <div className="storage__track" aria-label="已使用 24.8% 存储空间">
-            <span />
+          <span>{storageName || '存储空间'}</span>
+          <small>
+            {storageTotal !== null && storageTotal > 0
+              ? `已使用 ${formatBytes(storageUsed)} / ${formatBytes(storageTotal)}`
+              : '容量信息不可用'}
+          </small>
+          <div className="storage__track" aria-label={`已使用 ${storagePercent.toFixed(1)}% 存储空间`}>
+            <span style={{ width: `${storagePercent}%` }} />
           </div>
         </div>
-        <button className="upgrade-button" type="button">
-          <Cloud size={17} />
-          升级存储空间
-        </button>
         <button className="footer-link" type="button" onClick={onThemeClick}>
           <Palette size={17} />
           皮肤
