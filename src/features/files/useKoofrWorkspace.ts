@@ -35,12 +35,12 @@ export function useKoofrWorkspace(enabled: boolean) {
   const [state, setState] = useState<WorkspaceState>(initialState)
   const requestSequence = useRef(0)
 
-  const initialize = useCallback(async () => {
+  const initialize = useCallback(async (forceRefresh = false) => {
     const requestId = ++requestSequence.current
     setState((current) => ({ ...current, status: 'loading', error: '' }))
 
     try {
-      const mounts = await koofr.listMounts()
+      const mounts = await koofr.listMounts(forceRefresh)
       const activeMount = chooseInitialMount(mounts)
       if (!activeMount) {
         if (requestId === requestSequence.current) {
@@ -49,7 +49,7 @@ export function useKoofrWorkspace(enabled: boolean) {
         return
       }
 
-      const files = await koofr.listFiles(activeMount.id, '/')
+      const files = await koofr.listFiles(activeMount.id, '/', forceRefresh)
       if (requestId !== requestSequence.current) return
       setState({
         mounts,
@@ -70,7 +70,7 @@ export function useKoofrWorkspace(enabled: boolean) {
     }
   }, [])
 
-  const loadDirectory = useCallback(async (mountId: string, path: string) => {
+  const loadDirectory = useCallback(async (mountId: string, path: string, forceRefresh = false) => {
     const requestId = ++requestSequence.current
     setState((current) => ({
       ...current,
@@ -82,7 +82,7 @@ export function useKoofrWorkspace(enabled: boolean) {
     }))
 
     try {
-      const files = await koofr.listFiles(mountId, path)
+      const files = await koofr.listFiles(mountId, path, forceRefresh)
       if (requestId !== requestSequence.current) return
       setState((current) => ({
         ...current,
@@ -105,7 +105,7 @@ export function useKoofrWorkspace(enabled: boolean) {
 
   const refresh = useCallback(() => {
     if (!state.activeMountId) return Promise.resolve()
-    return loadDirectory(state.activeMountId, state.path)
+    return loadDirectory(state.activeMountId, state.path, true)
   }, [loadDirectory, state.activeMountId, state.path])
 
   useEffect(() => {

@@ -7,7 +7,8 @@
 - `src/transfer/`：流式上传/下载、进度事件、取消和下载临时文件清理。
 - `src/commands.rs`：暴露给 WebView 的窄范围 Tauri 命令。
 - `src/crypto/`、`src/vault_core/`：仍为空，Vault 尚未实现。
-- `src/credential_manager/`：仍为空，不会把应用密码或令牌持久化到普通配置。
+- `src/credential_manager.rs`：把用户明确选择保存的应用专用密码写入 Windows 凭据管理器；密码不会进入普通配置。
+- `src/settings.rs`、`src/metadata_cache.rs`：保存非敏感设置，并为挂载点、目录、最近文件、共享和回收站提供账户隔离的 TTL 缓存。
 
 ## 会话与安全边界
 
@@ -24,14 +25,17 @@
 - 发给前端的错误只包含稳定错误码与安全消息，不包含令牌、本地路径、远程路径或
   服务端响应正文。
 
-当前会话只在内存中存在。Windows Credential Manager 持久化、OAuth、公版应用注册
-与令牌刷新必须在后续认证里程碑确认后实现。
+当前会话令牌仍只在内存中存在。用户勾选“保存密码”后，应用专用密码由 Windows Credential Manager 保护，并在下次启动时仅由 Rust 后端读取以重新认证。OAuth、公版应用注册与令牌刷新必须在后续认证里程碑确认后实现。
+
+文件元数据缓存默认仅保存在内存中。用户可在设置中启用磁盘缓存；该缓存包含普通 Koofr 文件名和远程路径，保存在当前 Windows 用户的应用数据目录中，不包含密码、令牌或文件内容。切换到“不缓存”、清除缓存或更换账户会删除缓存条目。
 
 ## Tauri 命令
 
-`connect_koofr`、`disconnect_koofr`、`koofr_session`、`select_upload_file`、
+`connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
+`get_settings`、`update_settings`、`clear_metadata_cache`、`forget_saved_login`、`select_upload_file`、
 `select_download_location`、`list_mounts`、
-`list_files`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
+`list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
+`empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
 `delete_entry`、`upload_file`、`download_file`、`cancel_transfer`。
 
 传输通过 `koofr://transfer-progress` 事件报告运行、完成、取消或失败状态；事件不包含

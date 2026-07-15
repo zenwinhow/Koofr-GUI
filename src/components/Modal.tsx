@@ -8,13 +8,14 @@ interface ModalProps {
   onClose: () => void
   onAction?: () => void
   actionDisabled?: boolean
+  wide?: boolean
 }
 
-export function Modal({ title, children, actionLabel, onClose, onAction, actionDisabled = false }: ModalProps) {
+export function Modal({ title, children, actionLabel, onClose, onAction, actionDisabled = false, wide = false }: ModalProps) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className="modal"
+        className={`modal${wide ? ' modal--wide' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

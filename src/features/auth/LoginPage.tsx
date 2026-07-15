@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import {
   Cloud,
   Eye,
@@ -13,15 +13,24 @@ import { BrandMark } from '../../components/BrandMark'
 interface LoginPageProps {
   busy: boolean
   error: string
-  onLogin: (email: string, appPassword: string) => Promise<void>
+  initialEmail: string
+  onLogin: (email: string, appPassword: string, rememberPassword: boolean) => Promise<void>
   onThemeClick: () => void
 }
 
-export function LoginPage({ busy, error, onLogin, onThemeClick }: LoginPageProps) {
-  const [email, setEmail] = useState('')
+export function LoginPage({ busy, error, initialEmail, onLogin, onThemeClick }: LoginPageProps) {
+  const [email, setEmail] = useState(initialEmail)
   const [appPassword, setAppPassword] = useState('')
+  const [rememberPassword, setRememberPassword] = useState(Boolean(initialEmail))
   const [showPassword, setShowPassword] = useState(false)
   const [validationError, setValidationError] = useState('')
+
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail((current) => current || initialEmail)
+      setRememberPassword(true)
+    }
+  }, [initialEmail])
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -37,7 +46,7 @@ export function LoginPage({ busy, error, onLogin, onThemeClick }: LoginPageProps
     }
 
     setValidationError('')
-    await onLogin(normalizedEmail, appPassword)
+    await onLogin(normalizedEmail, appPassword, rememberPassword)
     setAppPassword('')
   }
 
@@ -66,7 +75,7 @@ export function LoginPage({ busy, error, onLogin, onThemeClick }: LoginPageProps
 
         <div className="auth-privacy">
           <ShieldCheck aria-hidden="true" />
-          <p>你的登录信息只用于建立本次连接，<br />不会保存在网页存储中。</p>
+          <p>密码不会写入网页存储；选择记住密码后，<br />将由 Windows 凭据管理器保护。</p>
         </div>
       </section>
 
@@ -124,6 +133,19 @@ export function LoginPage({ busy, error, onLogin, onThemeClick }: LoginPageProps
               </button>
             </span>
           </div>
+
+          <label className="auth-remember">
+            <input
+              type="checkbox"
+              checked={rememberPassword}
+              disabled={busy}
+              onChange={(event) => setRememberPassword(event.target.checked)}
+            />
+            <span>
+              <strong>保存密码</strong>
+              <small>下次启动时自动连接 Koofr</small>
+            </span>
+          </label>
 
           <div className={`auth-error${visibleError ? ' auth-error--visible' : ''}`} role="alert">
             {visibleError}

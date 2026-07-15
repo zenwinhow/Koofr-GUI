@@ -1,6 +1,6 @@
 mod models;
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use reqwest::{Client, Method, Response, StatusCode, Url, header};
 use serde::Serialize;
@@ -12,8 +12,11 @@ use crate::{
     file_ops::{MountId, RemoteName, RemotePath},
 };
 
-pub use models::{FileInfo, Mount, SessionInfo};
-use models::{FileListResponse, MountListResponse, TokenResponse};
+pub use models::{FileInfo, LocatedFile, Mount, SessionInfo, TrashItem, TrashList};
+use models::{
+    FileListResponse, MountListResponse, SearchResponse, SharedListResponse, TokenResponse,
+    TrashListResponse,
+};
 
 const USER_AGENT: &str = concat!("Koofr-GUI/", env!("CARGO_PKG_VERSION"));
 
@@ -146,6 +149,196 @@ impl KoofrApi {
                 .to_owned();
         }
         Ok(payload.files)
+    }
+
+    pub async fn list_recent(&self) -> Result<Vec<LocatedFile>, AppError> {
+        let mut url = self.endpoint(&["api", "v2", "search"])?;
+        url.query_pairs_mut()
+            .append_pair("limit", "1000")
+            .append_pair("offset", "0")
+            .append_pair("sortField", "mtime")
+            .append_pair("sortDir", "desc")
+            .append_pair("mountId", "")
+            .append_pair("path", "");
+        let response = self
+            .authenticated_request(Method::GET, url)
+            .await?
+            .send()
+            .await?;
+        let response = Self::expect_status(response, &[StatusCode::OK])?;
+        let payload: SearchResponse = Self::decode_json(response).await?;
+
+        Ok(payload
+            .hits
+            .into_iter()
+            .map(|hit| {
+                let mount_name = hit
+                    .mount
+                    .as_ref()
+                    .or_else(|| payload.mounts.get(&hit.mount_id))
+                    .map(|mount| mount.name.clone())
+                    .unwrap_or_default();
+                LocatedFile {
+                    mount_id: hit.mount_id,
+                    mount_name,
+                    name: hit.name,
+                    entry_type: hit.entry_type,
+                    modified: hit.modified,
+                    size: hit.size,
+                    content_type: hit.content_type,
+                    hash: hit.hash,
+                    path: hit.path,
+                    share_direction: None,
+                }
+            })
+            .collect())
+    }
+
+    pub async fn list_shared(&self) -> Result<Vec<LocatedFile>, AppError> {
+        let url = self.endpoint(&["api", "v2", "shared"])?;
+        let response = self
+            .authenticated_request(Method::GET, url)
+            .await?
+            .send()
+            .await?;
+        let response = Self::expect_status(response, &[StatusCode::OK])?;
+        let payload: SharedListResponse = Self::decode_json(response).await?;
+
+        Ok(payload
+            .files
+            .into_iter()
+            .map(|file| {
+                let share_direction = if file.mount.is_shared {
+                    "received"
+                } else {
+                    "outgoing"
+                };
+                LocatedFile {
+                    mount_id: file.mount.id,
+                    mount_name: file.mount.name,
+                    name: file.name,
+                    entry_type: file.entry_type,
+                    modified: file.modified,
+                    size: file.size,
+                    content_type: file.content_type,
+                    hash: file.hash,
+                    path: "/".to_owned(),
+                    share_direction: Some(share_direction.to_owned()),
+                }
+            })
+            .collect())
+    }
+
+    pub async fn list_trash(&self) -> Result<TrashList, AppError> {
+        let mut cursor: Option<String> = None;
+        let mut seen_cursors = HashSet::new();
+        let mut items = Vec::new();
+        let mut retention_days = 0;
+
+        loop {
+            let mut url = self.endpoint(&["api", "v2", "trash"])?;
+            if let Some(current_cursor) = cursor.as_deref() {
+                url.query_pairs_mut().append_pair("cursor", current_cursor);
+            } else {
+                url.query_pairs_mut()
+                    .append_pair("pageSize", "1000")
+                    .append_pair("sortField", "deleted")
+                    .append_pair("sortDir", "desc");
+            }
+            let response = self
+                .authenticated_request(Method::GET, url)
+                .await?
+                .send()
+                .await?;
+            let response = Self::expect_status(response, &[StatusCode::OK])?;
+            let payload: TrashListResponse = Self::decode_json(response).await?;
+            if retention_days == 0 {
+                retention_days = payload.retention_days;
+            }
+            items.extend(payload.files.into_iter().map(|file| {
+                TrashItem {
+                    mount_name: payload
+                        .mounts
+                        .get(&file.mount_id)
+                        .map(|mount| mount.name.clone())
+                        .unwrap_or_default(),
+                    version_id: file.id,
+                    mount_id: file.mount_id,
+                    path: file.path,
+                    name: file.name,
+                    deleted: file.deleted,
+                    size: file.size,
+                    content_type: file.content_type,
+                }
+            }));
+
+            let Some(next_cursor) = payload.page_info.cursor else {
+                break;
+            };
+            if !seen_cursors.insert(next_cursor.clone()) {
+                break;
+            }
+            cursor = Some(next_cursor);
+        }
+
+        Ok(TrashList {
+            items,
+            retention_days,
+        })
+    }
+
+    pub async fn restore_trash(&self, files: &[(MountId, RemotePath)]) -> Result<(), AppError> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct TrashFile<'a> {
+            mount_id: &'a str,
+            path: &'a str,
+        }
+        #[derive(Serialize)]
+        struct RestoreRequest<'a> {
+            files: Vec<TrashFile<'a>>,
+        }
+
+        let request = RestoreRequest {
+            files: files
+                .iter()
+                .map(|(mount_id, path)| TrashFile {
+                    mount_id: mount_id.as_str(),
+                    path: path.as_str(),
+                })
+                .collect(),
+        };
+        let url = self.endpoint(&["api", "v2", "trash", "undelete"])?;
+        let response = self
+            .authenticated_request(Method::POST, url)
+            .await?
+            .json(&request)
+            .send()
+            .await?;
+        Self::expect_status(
+            response,
+            &[
+                StatusCode::OK,
+                StatusCode::CREATED,
+                StatusCode::ACCEPTED,
+                StatusCode::NO_CONTENT,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub async fn empty_trash(&self) -> Result<(), AppError> {
+        let url = self.endpoint(&["api", "v2", "trash"])?;
+        let response = self
+            .authenticated_request(Method::DELETE, url)
+            .await?
+            .send()
+            .await?;
+        Self::expect_status(
+            response,
+            &[StatusCode::OK, StatusCode::ACCEPTED, StatusCode::NO_CONTENT],
+        )?;
+        Ok(())
     }
 
     pub async fn create_folder(
@@ -345,7 +538,7 @@ impl KoofrApi {
 
 #[cfg(test)]
 mod tests {
-    use httpmock::{Method::GET, Method::POST, Method::PUT, MockServer};
+    use httpmock::{Method::DELETE, Method::GET, Method::POST, Method::PUT, MockServer};
     use serde_json::json;
 
     use super::{KoofrApi, Session};
@@ -483,6 +676,185 @@ mod tests {
         mock.assert_async().await;
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "/资料/计划.txt");
+    }
+
+    #[tokio::test]
+    async fn maps_recent_search_request_and_locations() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(GET)
+                    .path("/api/v2/search")
+                    .query_param("limit", "1000")
+                    .query_param("offset", "0")
+                    .query_param("sortField", "mtime")
+                    .query_param("sortDir", "desc")
+                    .query_param("mountId", "")
+                    .query_param("path", "")
+                    .header("authorization", "Token token=test-token");
+                then.status(200).json_body(json!({
+                    "hits": [{
+                        "mountId": "mount_1",
+                        "name": "recent.txt",
+                        "type": "file",
+                        "modified": 123,
+                        "size": 42,
+                        "contentType": "text/plain",
+                        "hash": "hash",
+                        "path": "/docs/recent.txt"
+                    }],
+                    "mounts": {
+                        "mount_1": { "id": "mount_1", "name": "Koofr", "type": "device" }
+                    }
+                }));
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        let files = api.list_recent().await.expect("list recent files");
+
+        mock.assert_async().await;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].mount_id, "mount_1");
+        assert_eq!(files[0].mount_name, "Koofr");
+        assert_eq!(files[0].path, "/docs/recent.txt");
+    }
+
+    #[tokio::test]
+    async fn maps_shared_items_and_direction() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(GET)
+                    .path("/api/v2/shared")
+                    .header("authorization", "Token token=test-token");
+                then.status(200).json_body(json!({
+                    "files": [{
+                        "name": "Team folder",
+                        "type": "dir",
+                        "modified": 123,
+                        "size": 0,
+                        "mount": {
+                            "id": "shared_1",
+                            "name": "Team folder",
+                            "type": "shared",
+                            "isShared": true
+                        }
+                    }]
+                }));
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        let files = api.list_shared().await.expect("list shared files");
+
+        mock.assert_async().await;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "/");
+        assert_eq!(files[0].share_direction.as_deref(), Some("received"));
+    }
+
+    #[tokio::test]
+    async fn maps_trash_list_request_and_response() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(GET)
+                    .path("/api/v2/trash")
+                    .query_param("pageSize", "1000")
+                    .query_param("sortField", "deleted")
+                    .query_param("sortDir", "desc")
+                    .header("authorization", "Token token=test-token");
+                then.status(200).json_body(json!({
+                    "files": [{
+                        "id": 1,
+                        "mountId": "mount_1",
+                        "path": "/deleted.txt",
+                        "name": "deleted.txt",
+                        "deleted": 1784109600000_i64,
+                        "size": 42,
+                        "contentType": "text/plain"
+                    }],
+                    "mounts": {
+                        "mount_1": { "id": "mount_1", "name": "Koofr", "type": "device" }
+                    },
+                    "retentionDays": 30,
+                    "pageInfo": { "cursor": null }
+                }));
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        let trash = api.list_trash().await.expect("list trash");
+
+        mock.assert_async().await;
+        assert_eq!(trash.retention_days, 30);
+        assert_eq!(trash.items[0].version_id, "1");
+        assert_eq!(trash.items[0].mount_name, "Koofr");
+    }
+
+    #[tokio::test]
+    async fn restores_selected_trash_paths() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(POST)
+                    .path("/api/v2/trash/undelete")
+                    .header("authorization", "Token token=test-token")
+                    .json_body(json!({
+                        "files": [{ "mountId": "mount_1", "path": "/deleted.txt" }]
+                    }));
+                then.status(202);
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        api.restore_trash(&[(
+            MountId::parse("mount_1".to_owned()).expect("mount id"),
+            RemotePath::parse("/deleted.txt".to_owned()).expect("remote path"),
+        )])
+        .await
+        .expect("restore trash");
+
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn permanently_empties_trash() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(DELETE)
+                    .path("/api/v2/trash")
+                    .header("authorization", "Token token=test-token");
+                then.status(204);
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        api.empty_trash().await.expect("empty trash");
+
+        mock.assert_async().await;
     }
 
     #[tokio::test]

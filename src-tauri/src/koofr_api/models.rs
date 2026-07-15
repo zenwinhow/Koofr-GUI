@@ -1,4 +1,40 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StringOrInteger {
+    String(String),
+    Signed(i64),
+    Unsigned(u64),
+}
+
+impl StringOrInteger {
+    fn into_string(self) -> String {
+        match self {
+            Self::String(value) => value,
+            Self::Signed(value) => value.to_string(),
+            Self::Unsigned(value) => value.to_string(),
+        }
+    }
+}
+
+fn deserialize_string_or_integer<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    StringOrInteger::deserialize(deserializer).map(StringOrInteger::into_string)
+}
+
+fn deserialize_optional_string_or_integer<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<StringOrInteger>::deserialize(deserializer)
+        .map(|value| value.map(StringOrInteger::into_string))
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +78,41 @@ pub struct FileInfo {
     pub path: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocatedFile {
+    pub mount_id: String,
+    pub mount_name: String,
+    pub name: String,
+    pub entry_type: String,
+    pub modified: i64,
+    pub size: i64,
+    pub content_type: String,
+    pub hash: String,
+    pub path: String,
+    pub share_direction: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashItem {
+    pub version_id: String,
+    pub mount_id: String,
+    pub mount_name: String,
+    pub path: String,
+    pub name: String,
+    pub deleted: String,
+    pub size: i64,
+    pub content_type: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashList {
+    pub items: Vec<TrashItem>,
+    pub retention_days: i64,
+}
+
 #[derive(Debug, Deserialize)]
 pub(super) struct TokenResponse {
     pub token: String,
@@ -55,6 +126,86 @@ pub(super) struct MountListResponse {
 #[derive(Debug, Deserialize)]
 pub(super) struct FileListResponse {
     pub files: Vec<FileInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct SearchHit {
+    pub mount_id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub entry_type: String,
+    pub modified: i64,
+    pub size: i64,
+    #[serde(default)]
+    pub content_type: String,
+    #[serde(default)]
+    pub hash: String,
+    pub path: String,
+    #[serde(default)]
+    pub mount: Option<Mount>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SearchResponse {
+    pub hits: Vec<SearchHit>,
+    #[serde(default)]
+    pub mounts: HashMap<String, Mount>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SharedRemote {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub entry_type: String,
+    pub modified: i64,
+    pub size: i64,
+    #[serde(default)]
+    pub content_type: String,
+    #[serde(default)]
+    pub hash: String,
+    pub mount: Mount,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SharedListResponse {
+    pub files: Vec<SharedRemote>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct TrashRemote {
+    #[serde(
+        alias = "versionId",
+        deserialize_with = "deserialize_string_or_integer"
+    )]
+    pub id: String,
+    pub mount_id: String,
+    pub path: String,
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_string_or_integer")]
+    pub deleted: String,
+    pub size: i64,
+    #[serde(default)]
+    pub content_type: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct PageInfo {
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_integer")]
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct TrashListResponse {
+    pub files: Vec<TrashRemote>,
+    #[serde(default)]
+    pub mounts: HashMap<String, Mount>,
+    #[serde(default)]
+    pub retention_days: i64,
+    #[serde(default)]
+    pub page_info: PageInfo,
 }
 
 #[cfg(test)]

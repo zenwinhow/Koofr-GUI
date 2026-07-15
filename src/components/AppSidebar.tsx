@@ -9,13 +9,13 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react'
-import { formatBytes } from '../features/files/filePresentation'
+import { formatStorageMegabytes } from '../features/files/filePresentation'
 import { BrandMark } from './BrandMark'
 
 const primaryItems = [
   { label: '我的文件', icon: Folder },
-  { label: '最近使用', icon: Clock3 },
-  { label: '与我共享', icon: Share2 },
+  { label: '最近的文件', icon: Clock3 },
+  { label: '已共享', icon: Share2 },
   { label: '回收站', icon: Trash2 },
 ]
 
@@ -81,7 +81,7 @@ export function AppSidebar({
           <span>{storageName || '存储空间'}</span>
           <small>
             {storageTotal !== null && storageTotal > 0
-              ? `已使用 ${formatBytes(storageUsed)} / ${formatBytes(storageTotal)}`
+              ? `已使用 ${formatStorageMegabytes(storageUsed)} / ${formatStorageMegabytes(storageTotal)}`
               : '容量信息不可用'}
           </small>
           <div className="storage__track" aria-label={`已使用 ${storagePercent.toFixed(1)}% 存储空间`}>

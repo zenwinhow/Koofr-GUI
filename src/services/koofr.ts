@@ -1,12 +1,18 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
+  AppSettings,
+  CacheMode,
   KoofrMount,
   KoofrSession,
+  LocatedFile,
   LocalFileSelection,
+  LoginBootstrap,
   RemoteFile,
   TransferProgress,
   TransferResult,
+  TrashItem,
+  TrashList,
   CommandError,
 } from '../types/backend'
 
@@ -28,6 +34,17 @@ export function commandErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+export function commandErrorDiagnostic(error: unknown) {
+  if (
+    typeof error === 'object'
+    && error !== null
+    && typeof (error as Partial<CommandError>).diagnostic === 'string'
+  ) {
+    return (error as CommandError).diagnostic ?? ''
+  }
+  return ''
+}
+
 export function isCommandErrorCode(error: unknown, code: CommandError['code']) {
   return typeof error === 'object'
     && error !== null
@@ -35,8 +52,12 @@ export function isCommandErrorCode(error: unknown, code: CommandError['code']) {
 }
 
 export const koofr = {
-  connect(email: string, appPassword: string) {
-    return invoke<KoofrSession>('connect_koofr', { email, appPassword })
+  connect(email: string, appPassword: string, rememberPassword: boolean) {
+    return invoke<KoofrSession>('connect_koofr', { email, appPassword, rememberPassword })
+  },
+
+  restoreSavedLogin() {
+    return invoke<LoginBootstrap>('restore_saved_login')
   },
 
   disconnect() {
@@ -47,12 +68,54 @@ export const koofr = {
     return invoke<KoofrSession>('koofr_session')
   },
 
-  listMounts() {
-    return invoke<KoofrMount[]>('list_mounts')
+  getSettings() {
+    return invoke<AppSettings>('get_settings')
   },
 
-  listFiles(mountId: string, path = '/') {
-    return invoke<RemoteFile[]>('list_files', { mountId, path })
+  updateSettings(cacheMode: CacheMode, cacheTtlMinutes: number) {
+    return invoke<AppSettings>('update_settings', { cacheMode, cacheTtlMinutes })
+  },
+
+  clearMetadataCache() {
+    return invoke<AppSettings>('clear_metadata_cache')
+  },
+
+  forgetSavedLogin() {
+    return invoke<AppSettings>('forget_saved_login')
+  },
+
+  listMounts(refresh = false) {
+    return invoke<KoofrMount[]>('list_mounts', { refresh })
+  },
+
+  listFiles(mountId: string, path = '/', refresh = false) {
+    return invoke<RemoteFile[]>('list_files', { mountId, path, refresh })
+  },
+
+  listRecent(refresh = false) {
+    return invoke<LocatedFile[]>('list_recent', { refresh })
+  },
+
+  listShared(refresh = false) {
+    return invoke<LocatedFile[]>('list_shared', { refresh })
+  },
+
+  listTrash(refresh = false) {
+    return invoke<TrashList>('list_trash', { refresh })
+  },
+
+  restoreTrash(files: TrashItem[]) {
+    return invoke<void>('restore_trash', {
+      files: files.map(({ mountId, path }) => ({ mountId, path })),
+    })
+  },
+
+  restoreAllTrash() {
+    return invoke<void>('restore_trash', { files: [] })
+  },
+
+  emptyTrash(confirmation: string) {
+    return invoke<void>('empty_trash', { confirmation })
   },
 
   selectUploadFile() {

@@ -36,6 +36,10 @@ pub enum AppError {
     Initialization,
     #[error("native file dialog failed")]
     Dialog,
+    #[error("local application data operation failed")]
+    LocalData,
+    #[error("secure credential store operation failed")]
+    CredentialStore,
 }
 
 impl From<reqwest::Error> for AppError {
@@ -67,6 +71,8 @@ impl AppError {
 pub struct CommandError {
     pub code: &'static str,
     pub message: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diagnostic: Option<String>,
 }
 
 impl From<AppError> for CommandError {
@@ -96,21 +102,108 @@ impl From<AppError> for CommandError {
                 Self::new("network_error", "无法连接 Koofr，请检查网络后重试。")
             }
             AppError::Io(_) => Self::new("local_io_error", "无法读取或写入所选的本地文件。"),
-            AppError::Decode(_) => Self::new("invalid_response", "Koofr 返回了无法识别的数据。"),
+            AppError::Decode(error) => {
+                Self::new("invalid_response", "Koofr 返回了无法识别的数据。")
+                    .with_diagnostic(safe_decode_diagnostic(&error))
+            }
             AppError::Initialization => Self::new("initialization_error", "后端初始化失败。"),
             AppError::Dialog => Self::new("dialog_error", "无法打开本地文件选择窗口。"),
+            AppError::LocalData => Self::new("local_data_error", "无法读取或保存本地应用数据。"),
+            AppError::CredentialStore => Self::new(
+                "credential_store_error",
+                "无法访问 Windows 凭据管理器，请检查系统设置后重试。",
+            ),
         }
     }
 }
 
 impl CommandError {
     const fn new(code: &'static str, message: &'static str) -> Self {
-        Self { code, message }
+        Self {
+            code,
+            message,
+            diagnostic: None,
+        }
     }
+
+    fn with_diagnostic(mut self, diagnostic: String) -> Self {
+        self.diagnostic = Some(diagnostic);
+        self
+    }
+}
+
+fn safe_decode_diagnostic(error: &serde_json::Error) -> String {
+    let message = error.to_string();
+    let reason = extract_safe_field(&message, "missing field `")
+        .map(|field| format!("缺少字段 `{field}`"))
+        .or_else(|| {
+            extract_safe_field(&message, "unknown field `")
+                .map(|field| format!("包含未知字段 `{field}`"))
+        })
+        .or_else(|| type_mismatch_reason(&message))
+        .unwrap_or_else(|| match error.classify() {
+            serde_json::error::Category::Io => "读取 JSON 响应失败".to_owned(),
+            serde_json::error::Category::Syntax => "JSON 语法无效".to_owned(),
+            serde_json::error::Category::Data => "JSON 字段结构不匹配".to_owned(),
+            serde_json::error::Category::Eof => "JSON 响应不完整".to_owned(),
+        });
+
+    format!(
+        "{reason}（第 {} 行，第 {} 列）",
+        error.line(),
+        error.column()
+    )
+}
+
+fn extract_safe_field(message: &str, prefix: &str) -> Option<String> {
+    let value = message.split_once(prefix)?.1.split('`').next()?;
+    (!value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_'))
+    .then(|| value.to_owned())
+}
+
+fn type_mismatch_reason(message: &str) -> Option<String> {
+    let invalid = message.strip_prefix("invalid type: ")?;
+    let received = [
+        "null",
+        "boolean",
+        "integer",
+        "floating point",
+        "string",
+        "map",
+        "sequence",
+        "unit",
+        "byte array",
+        "character",
+    ]
+    .into_iter()
+    .find(|kind| invalid.starts_with(kind))
+    .unwrap_or("未知类型");
+    let expected = invalid
+        .split_once(", expected ")
+        .map(|(_, expected)| expected.split(" at line ").next().unwrap_or(expected))
+        .filter(|expected| {
+            !expected.is_empty()
+                && expected.len() <= 96
+                && expected.chars().all(|character| {
+                    character.is_ascii_alphanumeric()
+                        || matches!(character, ' ' | '_' | '-' | '[' | ']' | '(' | ')')
+                })
+        });
+
+    Some(match expected {
+        Some(expected) => format!("字段类型不匹配：收到 {received}，预期 {expected}"),
+        None => format!("字段类型不匹配：收到 {received}"),
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
+
     use super::{AppError, CommandError};
 
     #[test]
@@ -122,5 +215,43 @@ mod tests {
 
         assert!(!serialized.contains(diagnostic));
         assert_eq!(command.code, "local_io_error");
+        assert!(command.diagnostic.is_none());
+    }
+
+    #[test]
+    fn decode_errors_report_missing_fields_without_response_values() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct RequiredId {
+            id: String,
+        }
+
+        let private_value = "private-file-name.txt";
+        let error = serde_json::from_str::<RequiredId>(&format!(r#"{{"name":"{private_value}"}}"#))
+            .expect_err("missing id should fail");
+        let command = CommandError::from(AppError::Decode(error));
+        let diagnostic = command.diagnostic.expect("decode diagnostic");
+
+        assert!(diagnostic.contains("缺少字段 `id`"));
+        assert!(!diagnostic.contains(private_value));
+    }
+
+    #[test]
+    fn decode_errors_redact_invalid_string_values() {
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct RequiredSize {
+            size: i64,
+        }
+
+        let private_value = r"C:\Users\private\secret.txt";
+        let payload = serde_json::json!({ "size": private_value });
+        let error =
+            serde_json::from_value::<RequiredSize>(payload).expect_err("string size should fail");
+        let command = CommandError::from(AppError::Decode(error));
+        let diagnostic = command.diagnostic.expect("decode diagnostic");
+
+        assert!(diagnostic.contains("字段类型不匹配：收到 string"));
+        assert!(!diagnostic.contains(private_value));
     }
 }

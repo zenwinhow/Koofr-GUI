@@ -31,6 +31,12 @@ export function formatBytes(value: number | null, empty = '—') {
   return `${amount.toFixed(digits)} ${FILE_SIZE_UNITS[unitIndex]}`
 }
 
+// Koofr mount quota fields use MiB, while file and transfer sizes use bytes.
+export function formatStorageMegabytes(value: number | null, empty = '—') {
+  if (value === null || !Number.isFinite(value) || value < 0) return empty
+  return formatBytes(value * (1024 ** 2), empty)
+}
+
 export function formatModified(timestamp: number) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return '—'
   const milliseconds = timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp

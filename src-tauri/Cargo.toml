@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Windows-first desktop client for Koofr"
 authors = ["Koofr-GUI contributors"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 name = "koofr_gui_lib"
@@ -15,6 +15,7 @@ tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 futures-util = "0.3.32"
+keyring-core = "1.0.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "multipart", "query", "rustls", "stream"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -25,6 +26,7 @@ tokio = { version = "1.50.0", features = ["fs", "io-util", "macros", "rt-multi-t
 tokio-util = { version = "0.7.18", features = ["io", "rt"] }
 url = "2.5.8"
 uuid = { version = "1.23.0", features = ["v4"] }
+windows-native-keyring-store = "1.1.0"
 zeroize = "1.8.2"
 
 [dev-dependencies]

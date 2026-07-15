@@ -1,38 +1,69 @@
 mod commands;
+mod credential_manager;
 mod error;
 mod file_ops;
 mod koofr_api;
 mod local_access;
+mod metadata_cache;
+mod settings;
 mod transfer;
 
+use credential_manager::CredentialManager;
 use koofr_api::KoofrApi;
 use local_access::LocalAccessManager;
+use metadata_cache::MetadataCache;
+use settings::SettingsStore;
+use tauri::Manager;
 use transfer::TransferManager;
 
 pub struct AppState {
     api: KoofrApi,
     local_access: LocalAccessManager,
     transfers: TransferManager,
+    settings: SettingsStore,
+    cache: MetadataCache,
+    credentials: CredentialManager,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let api = KoofrApi::production().expect("failed to initialize the Koofr API client");
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState {
-            api,
-            local_access: LocalAccessManager::default(),
-            transfers: TransferManager::default(),
+        .setup(|app| {
+            let data_dir = app.path().app_local_data_dir()?;
+            let settings = SettingsStore::load(data_dir.join("settings.json"));
+            let cache = MetadataCache::load(
+                data_dir.join("metadata-cache.json"),
+                settings.initial_cache_mode() == settings::CacheMode::Disk,
+            );
+            app.manage(AppState {
+                api: KoofrApi::production()?,
+                local_access: LocalAccessManager::default(),
+                transfers: TransferManager::default(),
+                settings,
+                cache,
+                credentials: CredentialManager::initialize()?,
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::connect_koofr,
+            commands::restore_saved_login,
             commands::disconnect_koofr,
             commands::koofr_session,
+            commands::get_settings,
+            commands::update_settings,
+            commands::clear_metadata_cache,
+            commands::forget_saved_login,
             commands::select_upload_file,
             commands::select_download_location,
             commands::list_mounts,
             commands::list_files,
+            commands::list_recent,
+            commands::list_shared,
+            commands::list_trash,
+            commands::restore_trash,
+            commands::empty_trash,
             commands::create_folder,
             commands::rename_entry,
             commands::move_entry,
