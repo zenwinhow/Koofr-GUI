@@ -422,11 +422,20 @@ button:focus-visible, input:focus-visible {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-left: 20px;
   background: rgba(255,255,255,0.98);
   user-select: none;
 }
+
+.titlebar__drag-region {
+  height: 100%;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+}
+
+.titlebar__drag-region .brand-mark { pointer-events: none; }
 
 .brand-mark { display: flex; align-items: center; gap: 12px; font-size: 22px; }
 .brand-mark__glyph {
@@ -455,7 +464,19 @@ button:focus-visible, input:focus-visible {
 .brand-mark--compact .brand-mark__glyph::before { width: 8px; height: 4px; top: -5px; }
 
 .window-controls { height: 100%; display: flex; }
-.window-controls span { width: 54px; display: grid; place-items: center; color: #25272b; }
+.window-controls button {
+  width: 54px;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  color: #25272b;
+  cursor: default;
+}
+.window-controls button:hover { background: #e9ebee; }
+.window-controls .window-control--close:hover { background: #c42b1c; color: white; }
 
 .app-body { height: calc(100vh - 42px); min-height: 578px; display: flex; position: relative; }
 
@@ -784,8 +805,8 @@ button:focus-visible, input:focus-visible {
   .auth-form__heading { margin-bottom: 35px; }
   .auth-form__heading h1 { font-size: 31px; }
   .auth-theme { margin-top: 28px; }
-  .titlebar { padding-left: 14px; }
-  .window-controls span { width: 42px; }
+  .titlebar__drag-region { padding-left: 14px; }
+  .window-controls button { width: 42px; }
   .sidebar { display: none; }
   .workspace { padding: 18px 14px 28px; }
   .workspace__topbar { align-items: stretch; gap: 9px; flex-wrap: wrap; }
