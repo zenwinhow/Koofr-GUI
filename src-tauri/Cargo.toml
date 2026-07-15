@@ -1,0 +1,31 @@
+[package]
+name = "koofr-gui"
+version = "0.1.0"
+description = "Windows-first desktop client for Koofr"
+authors = ["Koofr-GUI contributors"]
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "koofr_gui_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+futures-util = "0.3.32"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "multipart", "query", "rustls", "stream"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-dialog = "2.7.1"
+thiserror = "2.0.18"
+tokio = { version = "1.50.0", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync"] }
+tokio-util = { version = "0.7.18", features = ["io", "rt"] }
+url = "2.5.8"
+uuid = { version = "1.23.0", features = ["v4"] }
+zeroize = "1.8.2"
+
+[dev-dependencies]
+httpmock = "0.8.2"

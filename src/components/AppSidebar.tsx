@@ -4,6 +4,7 @@ import {
   Folder,
   HelpCircle,
   LockKeyhole,
+  LogOut,
   Palette,
   Settings,
   Share2,
@@ -24,9 +25,17 @@ interface AppSidebarProps {
   onSettingsClick: () => void
   onThemeClick: () => void
   onVaultClick: () => void
+  onLogoutClick: () => void
 }
 
-export function AppSidebar({ activeItem, onSelect, onSettingsClick, onThemeClick, onVaultClick }: AppSidebarProps) {
+export function AppSidebar({
+  activeItem,
+  onSelect,
+  onSettingsClick,
+  onThemeClick,
+  onVaultClick,
+  onLogoutClick,
+}: AppSidebarProps) {
   return (
     <aside className="sidebar" aria-label="主导航">
       <div className="sidebar__brand">
@@ -76,6 +85,10 @@ export function AppSidebar({ activeItem, onSelect, onSettingsClick, onThemeClick
         <button className="footer-link" type="button" onClick={onSettingsClick}>
           <Settings size={17} />
           设置
+        </button>
+        <button className="footer-link" type="button" onClick={onLogoutClick}>
+          <LogOut size={17} />
+          退出登录
         </button>
         <button className="footer-link" type="button">
           <HelpCircle size={17} />

@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Minimal permissions for the main Koofr window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
+
