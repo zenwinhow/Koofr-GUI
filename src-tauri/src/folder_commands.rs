@@ -36,6 +36,22 @@ pub async fn select_download_folder(
 }
 
 #[tauri::command]
+pub async fn prepare_download_folder(
+    state: State<'_, AppState>,
+    suggested_name: String,
+    download_directory: String,
+) -> CommandResult<LocalFileSelection> {
+    let name = RemoteName::parse(suggested_name).map_err(CommandError::from)?;
+    let target = FolderDownloadTarget::from_parent(download_directory.into(), &name)
+        .await
+        .map_err(CommandError::from)?;
+    state
+        .local_access
+        .grant_download_directory(target.as_path().to_path_buf())
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 pub async fn download_folder(
     app: AppHandle,
     state: State<'_, AppState>,

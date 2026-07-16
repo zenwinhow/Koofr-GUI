@@ -76,6 +76,13 @@ export const koofr = {
     return invoke<AppSettings>('update_settings', { cacheMode, cacheTtlMinutes })
   },
 
+  updateDownloadSettings(downloadDirectory: string, askDownloadLocation: boolean) {
+    return invoke<AppSettings>('update_download_settings', {
+      downloadDirectory,
+      askDownloadLocation,
+    })
+  },
+
   clearMetadataCache() {
     return invoke<AppSettings>('clear_metadata_cache')
   },
@@ -128,6 +135,24 @@ export const koofr = {
 
   selectDownloadFolder(suggestedName: string) {
     return invoke<LocalFileSelection | null>('select_download_folder', { suggestedName })
+  },
+
+  selectDownloadDirectory() {
+    return invoke<string | null>('select_download_directory')
+  },
+
+  prepareDownloadLocation(suggestedName: string, downloadDirectory: string) {
+    return invoke<LocalFileSelection>('prepare_download_location', {
+      suggestedName,
+      downloadDirectory,
+    })
+  },
+
+  prepareDownloadFolder(suggestedName: string, downloadDirectory: string) {
+    return invoke<LocalFileSelection>('prepare_download_folder', {
+      suggestedName,
+      downloadDirectory,
+    })
   },
 
   createFolder(mountId: string, parentPath: string, name: string) {

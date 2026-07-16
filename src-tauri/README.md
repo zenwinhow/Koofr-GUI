@@ -18,8 +18,10 @@
 - 重新连接或断开账户会取消当前传输，并清除尚未使用的本地文件授权。
 - 远程路径必须是规范的绝对 Koofr 路径，拒绝 `.`、`..`、空段、NUL、超长名称和
   对根目录的破坏性操作。
-- 上传和下载路径只能由 Rust 打开的原生文件对话框授予；前端只拿到一次性、不透明、
-  区分读写方向的授权 ID，不能自行指定任意本地路径。上传还会拒绝符号链接。
+- 上传路径只能由 Rust 打开的原生文件对话框授予。下载父目录可由用户手动填写或通过
+  原生文件夹选择器获取；Rust 会验证它是现有的绝对目录且不是符号链接，只在其下使用
+  清理后的远端名称创建新目标，并签发一次性、区分文件/文件夹的授权 ID。前端不能指定
+  最终文件名或覆盖现有内容。上传同样拒绝符号链接。
 - 下载不覆盖现有文件；单文件先写入唯一 `.koofr-part-*` 文件。文件夹下载先递归建立
   清单，再写入同级唯一 `.koofr-part-*` 目录；全部成功后才原子改名，失败或取消时清理
   整个暂存树。Windows 非法名称会安全替换，同级清理后重名会稳定追加序号。
@@ -33,8 +35,9 @@
 ## Tauri 命令
 
 `connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
-`get_settings`、`update_settings`、`clear_metadata_cache`、`forget_saved_login`、`select_upload_file`、
-`select_download_location`、`select_download_folder`、`list_mounts`、
+`get_settings`、`update_settings`、`update_download_settings`、`clear_metadata_cache`、`forget_saved_login`、`select_upload_file`、
+`select_download_location`、`select_download_folder`、`select_download_directory`、
+`prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
 `empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
 `delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`。
