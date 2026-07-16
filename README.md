@@ -2,7 +2,7 @@
 
 Koofr-GUI 是一个 Windows 优先的 Koofr 桌面文件管理客户端，采用 Tauri v2、React、TypeScript 和 Rust 构建。项目目标是提供接近原生文件管理器的体验，而不是简单封装 Koofr 网页。
 
-> 项目仍在开发中。普通 Koofr 文件管理已有可运行实现；Koofr Vault 兼容层尚未实现，当前版本不应被视为完整或正式发布的软件。
+> 1.0.0 作为首个正式 Windows 发行版本，提供普通 Koofr 文件管理功能；Koofr Vault 兼容层尚未实现，因此 Vault 工作流不属于此版本范围。
 
 ## 当前功能
 
@@ -13,7 +13,7 @@ Koofr-GUI 是一个 Windows 优先的 Koofr 桌面文件管理客户端，采用
 - 流式传输、目录累计进度、取消操作，以及未完成文件和文件夹下载的临时内容清理。
 - 可配置的内存/磁盘元数据缓存和响应式桌面界面。
 
-尚未实现：Koofr Vault 解锁与加解密、Vault 传输、完整的传输重试/续传，以及安装包签名和发布流程。
+尚未实现：Koofr Vault 解锁与加解密、Vault 传输，以及完整的传输重试/续传。
 
 ## 快速开始
 
@@ -44,7 +44,7 @@ npm run check
 npm run build:desktop
 ```
 
-发布版可执行文件输出到 `src-tauri/target/release/koofr-gui.exe`。当前项目配置不生成安装包。
+发布版可执行文件输出到 `src-tauri/target/release/koofr-gui.exe`，NSIS 安装程序输出到 `src-tauri/target/release/bundle/nsis/`。
 
 ## 清理
 
@@ -114,4 +114,4 @@ Rust + Tauri core (`src-tauri/src/`)
 - 新增 Tauri 命令时必须在 Rust 侧验证路径、远程标识符和操作范围。
 - Vault 功能必须兼容 Koofr/rclone crypt，不能创建自定义加密格式。
 
-本项目目前没有自动发布流程。任何对外分发都需要另行完成安装包配置、代码签名、更新签名和发布验证。
+推送与版本号完全匹配的 `v*` 标签会触发 GitHub Actions：执行质量检查、导入代码签名证书、构建 NSIS 安装程序并创建同名 GitHub Release。发布所需机密、版本规则和操作步骤见 [发布流程](docs/RELEASING.md)。正式版不会上传未签名安装程序。

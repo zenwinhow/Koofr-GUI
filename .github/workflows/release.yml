@@ -1,0 +1,92 @@
+name: Publish Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish signed Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Verify release version
+        shell: powershell
+        run: |
+          $packageVersion = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $cargoVersion = ([regex]::Match((Get-Content -Raw src-tauri/Cargo.toml), '(?m)^version\s*=\s*"([^"]+)"')).Groups[1].Value
+
+          if ([string]::IsNullOrWhiteSpace($cargoVersion) -or $packageVersion -ne $tauriVersion -or $packageVersion -ne $cargoVersion) {
+            throw "package.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml must use the same version."
+          }
+
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "The release tag must be v$packageVersion."
+          }
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run release checks
+        run: npm run check
+
+      - name: Import Windows code-signing certificate
+        shell: powershell
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw "WINDOWS_CERTIFICATE and WINDOWS_CERTIFICATE_PASSWORD GitHub secrets are required for a formal release."
+          }
+
+          $certificatePath = Join-Path $env:RUNNER_TEMP "koofr-gui-release.pfx"
+          [System.IO.File]::WriteAllBytes($certificatePath, [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          try {
+            $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $certificate = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+            if ($null -eq $certificate -or -not $certificate.HasPrivateKey) {
+              throw "The imported certificate does not contain a private key."
+            }
+          }
+          finally {
+            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Koofr GUI v__VERSION__
+          releaseBody: See CHANGELOG.md for release notes.
+          releaseDraft: false
+          prerelease: false
+          args: --config src-tauri/tauri.release.conf.json

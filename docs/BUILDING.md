@@ -86,7 +86,7 @@ npm run build:desktop
 src-tauri/target/release/koofr-gui.exe
 ```
 
-当前 `src-tauri/tauri.conf.json` 中的 `bundle.active` 为 `false`，因此构建只生成可执行文件，不生成 MSI、NSIS 安装包或签名安装程序。不要把未签名的本地构建当作正式发布包。
+`src-tauri/tauri.conf.json` 启用了 NSIS 打包；构建会生成可执行文件和 `src-tauri/target/release/bundle/nsis/` 下的安装程序。本地构建不会导入发布证书，因此不要把未签名的本地安装程序当作正式发布包。正式发布由 GitHub Actions 构建并签名，具体步骤见 [发布流程](RELEASING.md)。
 
 ## 5. 质量检查
 
