@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ArrowDownToLine } from 'lucide-react'
 import { AppSidebar } from './components/AppSidebar'
 import { Modal } from './components/Modal'
 import { ThemePicker } from './components/ThemePicker'
@@ -311,6 +312,22 @@ function App() {
     }
   }
 
+  const openDownloadedFile = async (transferId: string) => {
+    try {
+      await koofr.openDownloadedFile(transferId)
+    } catch (error) {
+      showNotice(commandErrorMessage(error, '无法打开下载的文件。'))
+    }
+  }
+
+  const openDownloadedFolder = async (transferId: string) => {
+    try {
+      await koofr.openDownloadedFolder(transferId)
+    } catch (error) {
+      showNotice(commandErrorMessage(error, '无法打开文件所在的文件夹。'))
+    }
+  }
+
   const openCreateFolder = () => {
     setModalInput('')
     setPendingFiles([])
@@ -526,11 +543,22 @@ function App() {
             items={transfers}
             onClose={() => setTransferVisible(false)}
             onCancel={(transferId) => void cancelTransfer(transferId)}
+            onOpenFile={(transferId) => void openDownloadedFile(transferId)}
+            onOpenFolder={(transferId) => void openDownloadedFolder(transferId)}
             onClearFinished={() => setTransfers((current) => current.filter((item) => item.state === 'running'))}
           />
-          {!transferVisible && transfers.length > 0 ? (
-            <button className="transfer-reopen" type="button" onClick={() => setTransferVisible(true)}>
-              传输 {runningTransfers || transfers.length}
+          {!transferVisible ? (
+            <button
+              className="transfer-reopen"
+              type="button"
+              aria-label={transfers.length > 0 ? `打开下载界面，共 ${transfers.length} 个任务` : '打开下载界面'}
+              title="打开下载界面"
+              onClick={() => setTransferVisible(true)}
+            >
+              <ArrowDownToLine size={23} />
+              {transfers.length > 0 ? (
+                <span>{runningTransfers || transfers.length}</span>
+              ) : null}
             </button>
           ) : null}
         </div>

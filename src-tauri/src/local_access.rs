@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::error::AppError;
 
 const MAX_PENDING_GRANTS: usize = 64;
+const MAX_COMPLETED_DOWNLOADS: usize = 100;
 
 #[derive(Debug)]
 enum LocalPathGrant {
@@ -22,6 +23,7 @@ pub struct LocalFileSelection {
 #[derive(Default)]
 pub struct LocalAccessManager {
     grants: Mutex<HashMap<String, LocalPathGrant>>,
+    completed_downloads: Mutex<HashMap<String, PathBuf>>,
 }
 
 impl LocalAccessManager {
@@ -70,6 +72,29 @@ impl LocalAccessManager {
         }
     }
 
+    pub fn remember_download(&self, transfer_id: &str, path: PathBuf) -> Result<(), AppError> {
+        validate_grant_id(transfer_id)?;
+        let mut downloads = self
+            .completed_downloads
+            .lock()
+            .expect("completed download store poisoned");
+        if downloads.len() >= MAX_COMPLETED_DOWNLOADS {
+            downloads.clear();
+        }
+        downloads.insert(transfer_id.to_owned(), path);
+        Ok(())
+    }
+
+    pub fn completed_download(&self, transfer_id: &str) -> Result<PathBuf, AppError> {
+        validate_grant_id(transfer_id)?;
+        self.completed_downloads
+            .lock()
+            .expect("completed download store poisoned")
+            .get(transfer_id)
+            .cloned()
+            .ok_or(AppError::NotFound)
+    }
+
     fn take(&self, grant_id: &str) -> Result<LocalPathGrant, AppError> {
         validate_grant_id(grant_id)?;
         self.grants
@@ -83,6 +108,10 @@ impl LocalAccessManager {
         self.grants
             .lock()
             .expect("local path grant store poisoned")
+            .clear();
+        self.completed_downloads
+            .lock()
+            .expect("completed download store poisoned")
             .clear();
     }
 }

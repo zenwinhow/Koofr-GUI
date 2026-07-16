@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Koofr",
-        "width": 1440,
-        "height": 900,
+        "width": 1280,
+        "height": 720,
         "minWidth": 980,
         "minHeight": 640,
         "decorations": false,
@@ -30,4 +30,3 @@
     "active": false
   }
 }
-

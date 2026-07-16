@@ -763,6 +763,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .file-row:not(.file-row--header):hover { background: #fafafa; }
 .file-row--header { min-height: 60px; color: #444a53; font-size: 12px; }
+.file-row--parent { min-height: 62px; color: #7a818a; }
+.file-row--parent .file-name strong { font-size: 16px; letter-spacing: 1px; }
 .file-row--selected { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 13%, transparent), color-mix(in srgb, var(--accent) 5%, transparent)); }
 .file-row--selected::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); }
 .checkbox {
@@ -840,13 +842,50 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .transfer-item__percent { color: var(--accent); }
 .progress-track { margin-top: 13px; height: 5px; background: #dcdfe3; border-radius: 5px; overflow: hidden; }
 .progress-track span { display: block; height: 100%; width: 64%; background: var(--accent); border-radius: inherit; }
+.transfer-item__actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.transfer-item__actions button { border: 0; border-radius: 6px; background: #f0f2f4; color: #4b535d; padding: 6px 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; cursor: pointer; }
+.transfer-item__actions button:hover { background: var(--accent-soft); color: var(--accent-dark); }
 .transfer-panel__footer { margin-top: auto; border-top: 1px solid var(--border); min-height: 64px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; }
 .transfer-panel__footer button { border: 0; background: transparent; display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; padding: 8px 5px; }
 .transfer-panel__footer > span { color: #7a818a; font-size: 11px; }
 .transfer-empty { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #8a9098; }
 .transfer-empty strong { color: #3c4249; font-size: 13px; }
 .transfer-empty span { font-size: 11px; }
-.transfer-reopen { position: absolute; right: 16px; bottom: 16px; border: 1px solid color-mix(in srgb, var(--accent) 35%, white); background: white; color: var(--accent-dark); box-shadow: 0 8px 26px rgba(28,32,38,.12); border-radius: 8px; padding: 9px 13px; font-size: 12px; cursor: pointer; }
+.transfer-reopen {
+  position: absolute;
+  z-index: 4;
+  right: 22px;
+  bottom: 22px;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, white);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  box-shadow: 0 10px 30px rgba(28,32,38,.2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.transfer-reopen:hover { transform: translateY(-2px); background: var(--accent-dark); box-shadow: 0 14px 34px rgba(28,32,38,.24); }
+.transfer-reopen > span {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid white;
+  border-radius: 10px;
+  background: #d94b45;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; background: rgba(20,23,28,.28); display: grid; place-items: center; padding: 20px; }
 .modal { width: min(430px, 100%); border-radius: 12px; background: white; box-shadow: 0 24px 70px rgba(20,24,30,.24); padding: 27px; position: relative; }
@@ -988,7 +1027,22 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .theme-option__check:empty { background: transparent; }
 
 @media (max-width: 1280px) {
-  .transfer-panel { display: none; }
+  .transfer-panel {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(358px, 100%);
+    flex-basis: auto;
+    box-shadow: -12px 0 34px rgba(28,32,38,.14);
+  }
+  .transfer-panel--hidden {
+    width: 0;
+    transform: translateX(100%);
+    pointer-events: none;
+    box-shadow: none;
+  }
   .workspace { padding-left: 24px; padding-right: 24px; }
 }
 

@@ -63,6 +63,12 @@ function directoryHeading(path: string, activeMount?: KoofrMount) {
   return path.split('/').filter(Boolean).at(-1) ?? '我的文件'
 }
 
+function parentDirectory(path: string) {
+  const segments = path.split('/').filter(Boolean)
+  segments.pop()
+  return segments.length > 0 ? `/${segments.join('/')}` : '/'
+}
+
 export function FileWorkspace({
   mounts,
   activeMountId,
@@ -234,6 +240,22 @@ export function FileWorkspace({
           <span>大小</span>
           <LayoutList size={18} />
         </div>
+
+        {path !== '/' ? (
+          <div className="file-row file-row--parent" role="row">
+            <span aria-hidden="true" />
+            <button className="file-name file-name--button" type="button" onClick={() => onNavigate(parentDirectory(path))}>
+              <span className="file-glyph file-glyph--folder"><Folder size={22} strokeWidth={1.8} /></span>
+              <strong>..</strong>
+            </button>
+            <span>返回上一级目录</span>
+            <span />
+            <span>—</span>
+            <button className="row-action" type="button" aria-label="返回上一级目录" onClick={() => onNavigate(parentDirectory(path))}>
+              <ArrowUp size={18} />
+            </button>
+          </div>
+        ) : null}
 
         {visibleFiles.map((file) => {
           const kind = fileKind(file)

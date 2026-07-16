@@ -4,6 +4,7 @@ mod error;
 mod file_ops;
 mod koofr_api;
 mod local_access;
+mod local_open;
 mod metadata_cache;
 mod settings;
 mod transfer;
@@ -71,6 +72,8 @@ pub fn run() {
             commands::delete_entry,
             commands::upload_file,
             commands::download_file,
+            commands::open_downloaded_file,
+            commands::open_downloaded_folder,
             commands::cancel_transfer,
         ])
         .run(tauri::generate_context!())

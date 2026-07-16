@@ -12,6 +12,7 @@ use crate::{
     },
     koofr_api::{FileInfo, LocatedFile, Mount, SessionInfo, TrashList},
     local_access::LocalFileSelection,
+    local_open,
     settings::CacheMode,
     transfer::{self, TransferResult},
 };
@@ -562,20 +563,63 @@ pub async fn download_file(
         .local_access
         .take_download(&local_path_grant)
         .map_err(CommandError::from)?;
+    let completed_path = selected_path.clone();
     let local_path = LocalDownloadPath::from_selected(selected_path)
         .await
         .map_err(CommandError::from)?;
-    transfer::download(
+    let result = transfer::download(
         app,
         &state.api,
         &state.transfers,
-        transfer_id,
+        transfer_id.clone(),
         mount_id,
         remote_path,
         local_path,
     )
     .await
-    .map_err(Into::into)
+    .map_err(CommandError::from)?;
+    state
+        .local_access
+        .remember_download(&transfer_id, completed_path)
+        .map_err(CommandError::from)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn open_downloaded_file(
+    state: State<'_, AppState>,
+    transfer_id: String,
+) -> CommandResult<()> {
+    let path = state
+        .local_access
+        .completed_download(&transfer_id)
+        .map_err(CommandError::from)?;
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|_| CommandError::from(AppError::LocalOpen))?;
+    if !metadata.is_file() {
+        return Err(CommandError::from(AppError::LocalOpen));
+    }
+    local_open::open(&path).map_err(CommandError::from)
+}
+
+#[tauri::command]
+pub async fn open_downloaded_folder(
+    state: State<'_, AppState>,
+    transfer_id: String,
+) -> CommandResult<()> {
+    let path = state
+        .local_access
+        .completed_download(&transfer_id)
+        .map_err(CommandError::from)?;
+    let parent = path.parent().ok_or_else(|| CommandError::from(AppError::LocalOpen))?;
+    let metadata = tokio::fs::metadata(parent)
+        .await
+        .map_err(|_| CommandError::from(AppError::LocalOpen))?;
+    if !metadata.is_dir() {
+        return Err(CommandError::from(AppError::LocalOpen));
+    }
+    local_open::open(parent).map_err(CommandError::from)
 }
 
 #[tauri::command]

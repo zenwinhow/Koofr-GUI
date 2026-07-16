@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpToLine, Trash2, X } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpToLine, ExternalLink, FolderOpen, Trash2, X } from 'lucide-react'
 import { formatBytes } from '../files/filePresentation'
 import type { TransferItem } from '../../types/files'
 
@@ -7,6 +7,8 @@ interface TransferPanelProps {
   items: TransferItem[]
   onClose: () => void
   onCancel: (transferId: string) => void
+  onOpenFile: (transferId: string) => void
+  onOpenFolder: (transferId: string) => void
   onClearFinished: () => void
 }
 
@@ -22,6 +24,8 @@ export function TransferPanel({
   items,
   onClose,
   onCancel,
+  onOpenFile,
+  onOpenFolder,
   onClearFinished,
 }: TransferPanelProps) {
   const runningCount = items.filter((item) => item.state === 'running').length
@@ -55,6 +59,16 @@ export function TransferPanel({
                   <span className="transfer-item__percent">{Math.round(percent)}%</span>
                 </div>
                 <div className="progress-track"><span style={{ width: `${percent}%` }} /></div>
+                {item.direction === 'download' && item.state === 'completed' ? (
+                  <div className="transfer-item__actions">
+                    <button type="button" onClick={() => onOpenFile(item.id)}>
+                      <ExternalLink size={14} />打开文件
+                    </button>
+                    <button type="button" onClick={() => onOpenFolder(item.id)}>
+                      <FolderOpen size={14} />打开所在文件夹
+                    </button>
+                  </div>
+                ) : null}
               </div>
               {item.state === 'running' ? (
                 <button className="row-action" type="button" aria-label={`取消 ${item.name}`} onClick={() => onCancel(item.id)}>

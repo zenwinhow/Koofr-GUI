@@ -196,6 +196,14 @@ export const koofr = {
     return invoke<boolean>('cancel_transfer', { transferId })
   },
 
+  openDownloadedFile(transferId: string) {
+    return invoke<void>('open_downloaded_file', { transferId })
+  },
+
+  openDownloadedFolder(transferId: string) {
+    return invoke<void>('open_downloaded_folder', { transferId })
+  },
+
   onTransferProgress(listener: (progress: TransferProgress) => void): Promise<UnlistenFn> {
     return listen<TransferProgress>(TRANSFER_EVENT, (event) => listener(event.payload))
   },

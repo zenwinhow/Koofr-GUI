@@ -27,6 +27,7 @@ tokio-util = { version = "0.7.18", features = ["io", "rt"] }
 url = "2.5.8"
 uuid = { version = "1.23.0", features = ["v4"] }
 windows-native-keyring-store = "1.1.0"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 zeroize = "1.8.2"
 
 [dev-dependencies]

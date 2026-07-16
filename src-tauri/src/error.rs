@@ -40,6 +40,8 @@ pub enum AppError {
     LocalData,
     #[error("secure credential store operation failed")]
     CredentialStore,
+    #[error("the downloaded file could not be opened")]
+    LocalOpen,
 }
 
 impl From<reqwest::Error> for AppError {
@@ -112,6 +114,10 @@ impl From<AppError> for CommandError {
             AppError::CredentialStore => Self::new(
                 "credential_store_error",
                 "无法访问 Windows 凭据管理器，请检查系统设置后重试。",
+            ),
+            AppError::LocalOpen => Self::new(
+                "local_open_error",
+                "无法打开下载内容，它可能已被移动、删除或没有关联的应用。",
             ),
         }
     }
