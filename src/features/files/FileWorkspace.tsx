@@ -137,9 +137,7 @@ export function FileWorkspace({
   }
 
   const singleSelection = selectedFiles.length === 1 ? selectedFiles[0] : null
-  const downloadableSelection = singleSelection && !isDirectory(singleSelection)
-    ? singleSelection
-    : null
+  const downloadableSelection = singleSelection
   const crumbs = pathCrumbs(path)
   const syncedText = lastSyncedAt
     ? `同步于 ${lastSyncedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`

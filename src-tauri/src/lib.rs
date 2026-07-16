@@ -2,6 +2,8 @@ mod commands;
 mod credential_manager;
 mod error;
 mod file_ops;
+mod folder_commands;
+mod folder_download;
 mod koofr_api;
 mod local_access;
 mod local_open;
@@ -58,6 +60,7 @@ pub fn run() {
             commands::forget_saved_login,
             commands::select_upload_file,
             commands::select_download_location,
+            folder_commands::select_download_folder,
             commands::list_mounts,
             commands::list_files,
             commands::list_recent,
@@ -72,6 +75,7 @@ pub fn run() {
             commands::delete_entry,
             commands::upload_file,
             commands::download_file,
+            folder_commands::download_folder,
             commands::open_downloaded_file,
             commands::open_downloaded_folder,
             commands::cancel_transfer,

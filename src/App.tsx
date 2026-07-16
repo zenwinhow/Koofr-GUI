@@ -12,6 +12,7 @@ import { isCollectionView, useKoofrCollections } from './features/files/useKoofr
 import { useKoofrWorkspace } from './features/files/useKoofrWorkspace'
 import { SettingsPanel } from './features/settings/SettingsPanel'
 import { TransferPanel } from './features/transfers/TransferPanel'
+import { beginDownload } from './features/transfers/beginDownload'
 import {
   commandErrorMessage,
   isCommandErrorCode,
@@ -232,6 +233,7 @@ function App() {
         state: 'running',
         bytesTransferred: 0,
         totalBytes: null,
+        localKind: 'file',
       }, ...current])
       setTransferVisible(true)
 
@@ -263,23 +265,18 @@ function App() {
   }
 
   const handleDownload = async (file: RemoteFile, mountId = workspace.activeMountId) => {
-    if (!mountId || isDirectory(file)) return
+    if (!mountId) return
     try {
-      const selection = await koofr.selectDownloadLocation(file.name)
-      if (!selection) return
-
-      const transfer = koofr.downloadFile(
-        mountId,
-        file.path,
-        selection.grantId,
-      )
+      const transfer = await beginDownload(file, mountId)
+      if (!transfer) return
       setTransfers((current) => [{
         id: transfer.transferId,
         name: file.name,
         direction: 'download',
         state: 'running',
         bytesTransferred: 0,
-        totalBytes: file.size > 0 ? file.size : null,
+        totalBytes: transfer.localKind === 'file' && file.size > 0 ? file.size : null,
+        localKind: transfer.localKind,
       }, ...current])
       setTransferVisible(true)
 

@@ -43,7 +43,7 @@ impl KoofrApi {
         Self::new("https://app.koofr.net")
     }
 
-    fn new(base_url: &str) -> Result<Self, AppError> {
+    pub(crate) fn new(base_url: &str) -> Result<Self, AppError> {
         let base_url = Url::parse(base_url).map_err(|_| AppError::Initialization)?;
         if base_url.scheme() != "https" && !cfg!(test) {
             return Err(AppError::Initialization);

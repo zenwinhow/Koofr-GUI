@@ -10,7 +10,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import { formatStorageMegabytes } from '../features/files/filePresentation'
-import { BrandMark } from './BrandMark'
 
 const primaryItems = [
   { label: '我的文件', icon: Folder },
@@ -48,10 +47,6 @@ export function AppSidebar({
 
   return (
     <aside className="sidebar" aria-label="主导航">
-      <div className="sidebar__brand">
-        <BrandMark />
-      </div>
-
       <nav className="sidebar__nav">
         {primaryItems.map(({ label, icon: Icon }) => (
           <button

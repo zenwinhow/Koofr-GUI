@@ -11,6 +11,7 @@ const MAX_COMPLETED_DOWNLOADS: usize = 100;
 enum LocalPathGrant {
     Upload(PathBuf),
     Download(PathBuf),
+    DownloadDirectory(PathBuf),
 }
 
 #[derive(Debug, Serialize)]
@@ -28,25 +29,29 @@ pub struct LocalAccessManager {
 
 impl LocalAccessManager {
     pub fn grant_upload(&self, path: PathBuf) -> Result<LocalFileSelection, AppError> {
-        self.insert(path, true)
+        self.insert(LocalPathGrant::Upload(path))
     }
 
     pub fn grant_download(&self, path: PathBuf) -> Result<LocalFileSelection, AppError> {
-        self.insert(path, false)
+        self.insert(LocalPathGrant::Download(path))
     }
 
-    fn insert(&self, path: PathBuf, is_upload: bool) -> Result<LocalFileSelection, AppError> {
+    pub fn grant_download_directory(&self, path: PathBuf) -> Result<LocalFileSelection, AppError> {
+        self.insert(LocalPathGrant::DownloadDirectory(path))
+    }
+
+    fn insert(&self, grant: LocalPathGrant) -> Result<LocalFileSelection, AppError> {
+        let path = match &grant {
+            LocalPathGrant::Upload(path)
+            | LocalPathGrant::Download(path)
+            | LocalPathGrant::DownloadDirectory(path) => path,
+        };
         let file_name = path
             .file_name()
             .and_then(|name| name.to_str())
             .map(str::to_owned)
             .ok_or(AppError::InvalidInput("selected local file name"))?;
         let grant_id = uuid::Uuid::new_v4().to_string();
-        let grant = if is_upload {
-            LocalPathGrant::Upload(path)
-        } else {
-            LocalPathGrant::Download(path)
-        };
         let mut grants = self.grants.lock().expect("local path grant store poisoned");
         if grants.len() >= MAX_PENDING_GRANTS {
             grants.clear();
@@ -61,14 +66,27 @@ impl LocalAccessManager {
     pub fn take_upload(&self, grant_id: &str) -> Result<PathBuf, AppError> {
         match self.take(grant_id)? {
             LocalPathGrant::Upload(path) => Ok(path),
-            LocalPathGrant::Download(_) => Err(AppError::InvalidInput("upload path grant")),
+            LocalPathGrant::Download(_) | LocalPathGrant::DownloadDirectory(_) => {
+                Err(AppError::InvalidInput("upload path grant"))
+            }
         }
     }
 
     pub fn take_download(&self, grant_id: &str) -> Result<PathBuf, AppError> {
         match self.take(grant_id)? {
             LocalPathGrant::Download(path) => Ok(path),
-            LocalPathGrant::Upload(_) => Err(AppError::InvalidInput("download path grant")),
+            LocalPathGrant::Upload(_) | LocalPathGrant::DownloadDirectory(_) => {
+                Err(AppError::InvalidInput("download path grant"))
+            }
+        }
+    }
+
+    pub fn take_download_directory(&self, grant_id: &str) -> Result<PathBuf, AppError> {
+        match self.take(grant_id)? {
+            LocalPathGrant::DownloadDirectory(path) => Ok(path),
+            LocalPathGrant::Upload(_) | LocalPathGrant::Download(_) => {
+                Err(AppError::InvalidInput("download directory path grant"))
+            }
         }
     }
 
@@ -139,6 +157,12 @@ mod tests {
             .expect("create upload grant");
         assert!(manager.take_download(&selected.grant_id).is_err());
         assert!(manager.take_upload(&selected.grant_id).is_err());
+
+        let selected = manager
+            .grant_download_directory(PathBuf::from("C:\\files\\reports"))
+            .expect("create directory grant");
+        assert!(manager.take_download(&selected.grant_id).is_err());
+        assert!(manager.take_download_directory(&selected.grant_id).is_err());
 
         let selected = manager
             .grant_upload(PathBuf::from("C:\\files\\report.txt"))

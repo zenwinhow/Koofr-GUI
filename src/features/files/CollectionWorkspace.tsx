@@ -254,7 +254,7 @@ export function CollectionWorkspace({
       ) : !isTrash && selectedFiles.length > 0 ? (
         <div className="selection-toolbar" aria-label="所选文件操作">
           <strong>{selectedFiles.length}</strong><span>已选中</span><i />
-          <button type="button" disabled={!singleFile || isDirectory(singleFile)} onClick={() => singleFile && onDownload(singleFile)}>
+          <button type="button" disabled={!singleFile} onClick={() => singleFile && onDownload(singleFile)}>
             <ArrowDownToLine size={18} />下载
           </button>
           <button type="button" disabled={!canOpenLocation} onClick={() => singleFile && onOpenLocation(singleFile)}>

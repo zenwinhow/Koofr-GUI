@@ -311,7 +311,7 @@ fn validate_transfer_id(transfer_id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-fn emit_progress(
+pub(crate) fn emit_progress(
     app: &AppHandle,
     transfer_id: &str,
     direction: TransferDirection,
@@ -331,7 +331,7 @@ fn emit_progress(
     );
 }
 
-fn emit_terminal(
+pub(crate) fn emit_terminal(
     app: &AppHandle,
     transfer_id: &str,
     direction: TransferDirection,

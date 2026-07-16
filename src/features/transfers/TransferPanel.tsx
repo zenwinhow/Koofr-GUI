@@ -61,9 +61,11 @@ export function TransferPanel({
                 <div className="progress-track"><span style={{ width: `${percent}%` }} /></div>
                 {item.direction === 'download' && item.state === 'completed' ? (
                   <div className="transfer-item__actions">
-                    <button type="button" onClick={() => onOpenFile(item.id)}>
-                      <ExternalLink size={14} />打开文件
-                    </button>
+                    {item.localKind === 'file' ? (
+                      <button type="button" onClick={() => onOpenFile(item.id)}>
+                        <ExternalLink size={14} />打开文件
+                      </button>
+                    ) : null}
                     <button type="button" onClick={() => onOpenFolder(item.id)}>
                       <FolderOpen size={14} />打开所在文件夹
                     </button>

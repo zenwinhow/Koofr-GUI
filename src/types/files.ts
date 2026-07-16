@@ -9,4 +9,5 @@ export interface TransferItem {
   state: TransferState
   bytesTransferred: number
   totalBytes: number | null
+  localKind: 'file' | 'folder'
 }

@@ -4,7 +4,7 @@
 
 - `src/file_ops/`：挂载点 ID、远程路径、远程名称和本地选择路径的校验。
 - `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除及内容请求。
-- `src/transfer/`：流式上传/下载、进度事件、取消和下载临时文件清理。
+- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、递归目录清单、进度事件、取消和下载临时内容清理。
 - `src/commands.rs`：暴露给 WebView 的窄范围 Tauri 命令。
 - `src/crypto/`、`src/vault_core/`：仍为空，Vault 尚未实现。
 - `src/credential_manager.rs`：把用户明确选择保存的应用专用密码写入 Windows 凭据管理器；密码不会进入普通配置。
@@ -20,8 +20,9 @@
   对根目录的破坏性操作。
 - 上传和下载路径只能由 Rust 打开的原生文件对话框授予；前端只拿到一次性、不透明、
   区分读写方向的授权 ID，不能自行指定任意本地路径。上传还会拒绝符号链接。
-- 下载不覆盖现有文件；先写入目标目录中的唯一 `.koofr-part-*` 文件，成功同步后再
-  原子改名，失败或取消时清理临时文件。
+- 下载不覆盖现有文件；单文件先写入唯一 `.koofr-part-*` 文件。文件夹下载先递归建立
+  清单，再写入同级唯一 `.koofr-part-*` 目录；全部成功后才原子改名，失败或取消时清理
+  整个暂存树。Windows 非法名称会安全替换，同级清理后重名会稳定追加序号。
 - 发给前端的错误只包含稳定错误码与安全消息，不包含令牌、本地路径、远程路径或
   服务端响应正文。
 
@@ -33,10 +34,10 @@
 
 `connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
 `get_settings`、`update_settings`、`clear_metadata_cache`、`forget_saved_login`、`select_upload_file`、
-`select_download_location`、`list_mounts`、
+`select_download_location`、`select_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
 `empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
-`delete_entry`、`upload_file`、`download_file`、`cancel_transfer`。
+`delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`。
 
 传输通过 `koofr://transfer-progress` 事件报告运行、完成、取消或失败状态；事件不包含
 本地或远程文件名。对应 TypeScript 封装位于 `src/services/koofr.ts`。

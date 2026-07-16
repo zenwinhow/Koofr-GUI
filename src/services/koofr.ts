@@ -126,6 +126,10 @@ export const koofr = {
     return invoke<LocalFileSelection | null>('select_download_location', { suggestedName })
   },
 
+  selectDownloadFolder(suggestedName: string) {
+    return invoke<LocalFileSelection | null>('select_download_folder', { suggestedName })
+  },
+
   createFolder(mountId: string, parentPath: string, name: string) {
     return invoke<void>('create_folder', { mountId, parentPath, name })
   },
@@ -184,6 +188,19 @@ export const koofr = {
     return {
       transferId,
       result: invoke<TransferResult>('download_file', {
+        transferId,
+        mountId,
+        remotePath,
+        localPathGrant,
+      }),
+    }
+  },
+
+  downloadFolder(mountId: string, remotePath: string, localPathGrant: string) {
+    const transferId = crypto.randomUUID()
+    return {
+      transferId,
+      result: invoke<TransferResult>('download_folder', {
         transferId,
         mountId,
         remotePath,
