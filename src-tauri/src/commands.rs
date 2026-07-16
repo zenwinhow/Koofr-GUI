@@ -612,7 +612,9 @@ pub async fn open_downloaded_folder(
         .local_access
         .completed_download(&transfer_id)
         .map_err(CommandError::from)?;
-    let parent = path.parent().ok_or_else(|| CommandError::from(AppError::LocalOpen))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| CommandError::from(AppError::LocalOpen))?;
     let metadata = tokio::fs::metadata(parent)
         .await
         .map_err(|_| CommandError::from(AppError::LocalOpen))?;

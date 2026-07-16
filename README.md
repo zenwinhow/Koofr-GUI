@@ -1,56 +1,93 @@
 # Koofr-GUI
 
-Windows 优先的 Koofr 桌面客户端。目前包含 React / TypeScript UI，以及首个
-Rust / Tauri 普通文件后端切片。Vault 尚未实现；应用专用密码可选择保存到 Windows 凭据管理器。
+Koofr-GUI 是一个 Windows 优先的 Koofr 桌面文件管理客户端，采用 Tauri v2、React、TypeScript 和 Rust 构建。项目目标是提供接近原生文件管理器的体验，而不是简单封装 Koofr 网页。
 
-## 当前可用内容
+> 项目仍在开发中。普通 Koofr 文件管理已有可运行实现；Koofr Vault 兼容层尚未实现，当前版本不应被视为完整或正式发布的软件。
 
-- 可运行的 Tauri v2 + Vite + React + TypeScript 桌面工具链。
-- “我的文件”主工作区：真实挂载点、目录导航、筛选、文件表格和传输面板。
-- 新建文件夹、上传、下载、重命名、删除及可取消传输已接入 Rust 后端。
-- 最近的文件、已共享和回收站均读取真实 Koofr 数据；回收站支持恢复、恢复全部和确认后永久清空。
-- 响应式桌面与窄屏布局。
-- 五套可持久化的颜色主题，默认使用 Koofr 绿色。
-- 登录页、启动会话检查、登录门禁与退出登录流程。
-- 可选的 Windows 凭据管理器密码保存与启动时自动连接；密码不会进入普通配置或 WebView 存储。
-- 设置界面与带有效期的文件元数据缓存，支持关闭、仅内存和本地磁盘三种模式。
-- Koofr 应用密码换取内存会话、挂载点与目录列表命令。
-- 新建文件夹、重命名、移动、复制和删除命令。
-- 可取消的流式上传/下载及脱敏进度事件。
+## 当前功能
 
-登录页已接入 `src/services/koofr.ts`：应用密码只用于换取后端内存令牌；只有用户明确
-勾选“保存密码”时才会写入 Windows 凭据管理器，不会写入应用配置或 WebView 存储。登录后会读取真实 Koofr 挂载点和目录；
-文件名、容量、修改时间、大小及传输状态均来自后端。Vault 以及移动、复制的前端交互
-仍属于后续迭代。后端不会自动访问真实账户，只有用户显式登录或执行文件命令
-时才会发起请求。
+- Koofr 应用专用密码登录、启动时恢复会话和退出登录。
+- 可选使用 Windows Credential Manager 保存登录凭据；密码不会写入普通配置或 WebView 存储。
+- 浏览挂载点、目录、最近文件、共享内容和回收站。
+- 新建文件夹、上传、下载、重命名、移动、复制、删除和回收站恢复。
+- 流式传输、进度事件、取消操作以及未完成下载的临时文件清理。
+- 可配置的内存/磁盘元数据缓存和响应式桌面界面。
 
-## 本地运行
+尚未实现：Koofr Vault 解锁与加解密、Vault 传输、完整的传输重试/续传，以及安装包签名和发布流程。
+
+## 快速开始
+
+构建环境需要 Node.js 24 LTS、npm 10+、Rust 1.88+ MSVC 工具链、Visual Studio C++ Build Tools、Windows SDK 和 WebView2。
 
 ```powershell
-npm install
-npm run dev
-```
-
-默认地址为 `http://127.0.0.1:1420/`。
-
-运行桌面应用：
-
-```powershell
+git clone <仓库地址>
+Set-Location Koofr-GUI
+npm ci
 npm run dev:desktop
 ```
 
-Windows 构建需要 Rust MSVC 工具链、Visual Studio C++ Build Tools、Windows SDK
-和 WebView2。
-
-## 检查
+仅运行前端开发服务器：
 
 ```powershell
-npm run check
+npm run dev
 ```
 
-该命令运行 ESLint、TypeScript/Vite 构建、Rust 格式检查、Clippy 和 Rust 测试。
+完整的环境安装、检查、发布构建、产物位置、故障排查和清理说明请阅读 [构建与清理指南](docs/BUILDING.md)。
 
-## 计划架构
+## 构建与检查
+
+```powershell
+# 运行 ESLint、前端生产构建、Rust 格式检查、Clippy 和单元测试
+npm run check
+
+# 构建 Windows 发布版可执行文件
+npm run build:desktop
+```
+
+发布版可执行文件输出到 `src-tauri/target/release/koofr-gui.exe`。当前项目配置不生成安装包。
+
+## 清理
+
+```powershell
+# 删除前端、Rust 和 Tauri 的可再生成构建产物，保留已安装依赖
+npm run clean
+
+# 同时删除 node_modules；之后需要重新执行 npm ci
+npm run clean:all
+```
+
+清理脚本只操作仓库内的固定目录，不删除源码、锁文件、Windows 凭据或应用用户数据。各命令的准确删除范围见 [构建与清理指南](docs/BUILDING.md#6-清理构建产物)。
+
+## 常用命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `npm ci` | 按 `package-lock.json` 可复现地安装依赖 |
+| `npm run dev` | 启动 Vite 前端开发服务器 |
+| `npm run dev:desktop` | 启动完整 Tauri 桌面开发环境 |
+| `npm run build` | 类型检查并生成 `dist/` 前端资源 |
+| `npm run build:desktop` | 构建 Windows 发布版可执行文件 |
+| `npm run check` | 运行全部前端和 Rust 检查 |
+| `npm run clean` | 清理构建产物并保留依赖 |
+| `npm run clean:all` | 清理构建产物和 `node_modules/` |
+
+## 目录结构
+
+```text
+Koofr-GUI/
+|-- docs/                 项目文档和设计资料
+|-- public/               前端静态资源
+|-- scripts/              项目维护脚本
+|-- src/                  React / TypeScript 界面与 Tauri 调用封装
+|-- src-tauri/            Rust / Tauri 后端、权限和桌面配置
+|-- package.json          npm 命令与前端依赖
+|-- package-lock.json     锁定的 JavaScript 依赖
+`-- src-tauri/Cargo.lock  锁定的 Rust 依赖
+```
+
+前端目录职责见 [src/README.md](src/README.md)，Rust/Tauri 边界和命令说明见 [src-tauri/README.md](src-tauri/README.md)。
+
+## 架构与安全边界
 
 ```text
 React + TypeScript UI (`src/`)
@@ -58,12 +95,23 @@ React + TypeScript UI (`src/`)
         | typed, narrowly scoped Tauri commands/events
         v
 Rust + Tauri core (`src-tauri/src/`)
-        |-- file_ops/
-        |-- transfer/
-        |-- koofr_api/
-        |-- vault_core/
-        |-- crypto/
-        `-- credential_manager/
+        |-- file_ops/            路径与文件操作校验
+        |-- transfer/            上传、下载、进度与取消
+        |-- koofr_api/           Koofr REST API
+        |-- credential_manager/  Windows 安全凭据存储
+        |-- vault_core/          计划中的 Vault 兼容层
+        `-- crypto/              计划中的加密支持
 ```
 
-基础文件后端的命令与安全边界见 `src-tauri/README.md`。Vault 与完整传输队列仍属于后续里程碑。
+凭据、文件系统访问、网络请求和未来的 Vault 密钥处理均保留在 Rust 边界内。前端只调用受限且类型化的 Tauri 命令，不应保存密码、令牌或 Vault Safe Key。
+
+## 开发约定
+
+- 使用 `npm ci` 和已提交的两个锁文件，不随意升级依赖。
+- 编辑器遵循根目录 `.editorconfig`；文本文件统一使用 UTF-8 和 LF 换行。
+- 提交前运行 `npm run check`。
+- 不提交构建产物、依赖目录、账号凭据、访问令牌或真实 Secret 形式的测试数据。
+- 新增 Tauri 命令时必须在 Rust 侧验证路径、远程标识符和操作范围。
+- Vault 功能必须兼容 Koofr/rclone crypt，不能创建自定义加密格式。
+
+本项目目前没有自动发布流程。任何对外分发都需要另行完成安装包配置、代码签名、更新签名和发布验证。
