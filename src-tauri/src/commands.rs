@@ -41,6 +41,8 @@ pub struct SettingsSnapshot {
     cached_items: usize,
     cache_disk_bytes: u64,
     saved_email: Option<String>,
+    download_directory: String,
+    ask_download_location: bool,
 }
 
 #[tauri::command]
@@ -213,12 +215,60 @@ pub async fn select_download_location(
 }
 
 #[tauri::command]
+pub async fn select_download_directory(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<Option<String>> {
+    let (initial_directory, _) = state.settings.download_policy().await;
+    let Some(directory) = app
+        .dialog()
+        .file()
+        .set_directory(initial_directory)
+        .blocking_pick_folder()
+    else {
+        return Ok(None);
+    };
+    let path = directory
+        .into_path()
+        .map_err(|_| CommandError::from(AppError::Dialog))?;
+    let metadata = tokio::fs::symlink_metadata(&path)
+        .await
+        .map_err(|error| CommandError::from(AppError::from(error)))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(CommandError::from(AppError::InvalidInput(
+            "download directory",
+        )));
+    }
+    path.to_str()
+        .map(str::to_owned)
+        .map(Some)
+        .ok_or_else(|| CommandError::from(AppError::InvalidInput("download directory")))
+}
+
+#[tauri::command]
+pub async fn prepare_download_location(
+    state: State<'_, AppState>,
+    suggested_name: String,
+    download_directory: String,
+) -> CommandResult<LocalFileSelection> {
+    let name = RemoteName::parse(suggested_name).map_err(CommandError::from)?;
+    let target = LocalDownloadPath::from_parent(PathBuf::from(download_directory), &name)
+        .await
+        .map_err(CommandError::from)?;
+    state
+        .local_access
+        .grant_download(target.as_path().to_path_buf())
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 pub async fn koofr_session(state: State<'_, AppState>) -> CommandResult<SessionInfo> {
     Ok(state.api.session_info().await)
 }
 
 async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
     let (cache_mode, cache_ttl_minutes) = state.settings.cache_policy().await;
+    let (download_directory, ask_download_location) = state.settings.download_policy().await;
     let (cached_items, cache_disk_bytes) = state.cache.stats().await;
     SettingsSnapshot {
         cache_mode,
@@ -226,6 +276,8 @@ async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
         cached_items,
         cache_disk_bytes,
         saved_email: state.settings.remembered_email().await,
+        download_directory: download_directory.to_string_lossy().into_owned(),
+        ask_download_location,
     }
 }
 
@@ -248,6 +300,23 @@ pub async fn update_settings(
     state
         .cache
         .apply_mode(cache_mode)
+        .await
+        .map_err(CommandError::from)?;
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn update_download_settings(
+    state: State<'_, AppState>,
+    download_directory: String,
+    ask_download_location: bool,
+) -> CommandResult<SettingsSnapshot> {
+    state
+        .settings
+        .update_download(
+            PathBuf::from(download_directory.trim()),
+            ask_download_location,
+        )
         .await
         .map_err(CommandError::from)?;
     Ok(settings_snapshot(&state).await)
@@ -631,3 +700,4 @@ pub fn cancel_transfer(state: State<'_, AppState>, transfer_id: String) -> Comma
         .cancel(&transfer_id)
         .map_err(CommandError::from)
 }
+use std::path::PathBuf;

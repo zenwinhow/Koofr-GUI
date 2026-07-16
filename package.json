@@ -13,12 +13,13 @@
     "build": "tsc -b && vite build",
     "build:desktop": "tauri build",
     "lint": "eslint .",
+    "test": "vitest run",
     "clean:frontend": "node scripts/clean.mjs frontend",
     "clean:rust": "node scripts/clean.mjs rust",
     "clean": "node scripts/clean.mjs build",
     "clean:all": "node scripts/clean.mjs all",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
-    "check": "npm run lint && npm run build && npm run check:rust",
+    "check": "npm run lint && npm run test && npm run build && npm run check:rust",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -29,12 +30,18 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "10.7.0",
+    "jsdom": "^29.1.1",
+    "react-grab": "^0.1.48",
+    "react-scan": "^0.5.7",
     "typescript": "6.0.3",
     "typescript-eslint": "8.64.0",
-    "vite": "8.1.4"
+    "vite": "8.1.4",
+    "vitest": "^4.1.10"
   }
 }
