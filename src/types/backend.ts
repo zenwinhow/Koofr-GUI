@@ -33,11 +33,13 @@ export interface LoginBootstrap {
 export type CacheMode = 'off' | 'memory' | 'disk'
 
 export interface AppSettings {
-  cacheMode: CacheMode
-  cacheTtlMinutes: number
-  cachedItems: number
-  cacheDiskBytes: number
-  savedEmail: string | null
+  readonly cacheMode: CacheMode
+  readonly cacheTtlMinutes: number
+  readonly cachedItems: number
+  readonly cacheDiskBytes: number
+  readonly savedEmail: string | null
+  readonly downloadDirectory: string
+  readonly askDownloadLocation: boolean
 }
 
 export interface KoofrMount {
@@ -106,6 +108,6 @@ export interface TransferResult {
 }
 
 export interface LocalFileSelection {
-  grantId: string
-  fileName: string
+  readonly grantId: string
+  readonly fileName: string
 }

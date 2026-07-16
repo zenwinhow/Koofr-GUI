@@ -11,6 +11,7 @@ import { isDirectory } from './features/files/filePresentation'
 import { isCollectionView, useKoofrCollections } from './features/files/useKoofrCollections'
 import { useKoofrWorkspace } from './features/files/useKoofrWorkspace'
 import { SettingsPanel } from './features/settings/SettingsPanel'
+import { DownloadDestinationDialog } from './features/transfers/DownloadDestinationDialog'
 import { TransferPanel } from './features/transfers/TransferPanel'
 import { beginDownload } from './features/transfers/beginDownload'
 import {
@@ -30,8 +31,13 @@ import type {
 } from './types/backend'
 import type { TransferItem } from './types/files'
 
-type ModalKind = 'settings' | 'theme' | 'vault' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
+type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
 type AuthState = 'checking' | 'signedOut' | 'signingIn' | 'signedIn'
+
+interface PendingDownload {
+  readonly file: RemoteFile
+  readonly mountId: string
+}
 
 function App() {
   const [activeItem, setActiveItem] = useState('我的文件')
@@ -50,15 +56,23 @@ function App() {
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [settingsBusy, setSettingsBusy] = useState(false)
   const [settingsError, setSettingsError] = useState('')
+  const [downloadSettingsError, setDownloadSettingsError] = useState('')
+  const [pendingDownload, setPendingDownload] = useState<PendingDownload | null>(null)
+  const [downloadDirectory, setDownloadDirectory] = useState('')
+  const [downloadBusy, setDownloadBusy] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
   const workspace = useKoofrWorkspace(authState === 'signedIn')
   const collections = useKoofrCollections(authState === 'signedIn', activeItem)
   const workspaceLocation = useRef({ activeMountId: '', path: '/' })
-  workspaceLocation.current = {
-    activeMountId: workspace.activeMountId,
-    path: workspace.path,
-  }
   const activeMount = workspace.mounts.find((mount) => mount.id === workspace.activeMountId)
   const runningTransfers = transfers.filter((transfer) => transfer.state === 'running').length
+
+  useEffect(() => {
+    workspaceLocation.current = {
+      activeMountId: workspace.activeMountId,
+      path: workspace.path,
+    }
+  }, [workspace.activeMountId, workspace.path])
 
   useEffect(() => {
     let active = true
@@ -152,6 +166,7 @@ function App() {
     setModalKind('settings')
     setSettingsLoading(true)
     setSettingsError('')
+    setDownloadSettingsError('')
     try {
       setSettings(await koofr.getSettings())
     } catch (error) {
@@ -170,6 +185,37 @@ function App() {
       setSettingsError(commandErrorMessage(error, '无法保存缓存设置。'))
     } finally {
       setSettingsBusy(false)
+    }
+  }
+
+  const updateDownloadSettings = async (
+    nextDownloadDirectory: string,
+    askDownloadLocation: boolean,
+  ) => {
+    setSettingsBusy(true)
+    setSettingsError('')
+    setDownloadSettingsError('')
+    try {
+      const nextSettings = await koofr.updateDownloadSettings(
+        nextDownloadDirectory,
+        askDownloadLocation,
+      )
+      setSettings(nextSettings)
+      showNotice('下载设置已保存')
+    } catch (error) {
+      setDownloadSettingsError(commandErrorMessage(error, '无法保存下载设置，请检查文件夹路径。'))
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
+
+  const browseSettingsDownloadDirectory = async () => {
+    setDownloadSettingsError('')
+    try {
+      return await koofr.selectDownloadDirectory()
+    } catch (error) {
+      setDownloadSettingsError(commandErrorMessage(error, '无法打开下载文件夹选择器。'))
+      return null
     }
   }
 
@@ -264,22 +310,24 @@ function App() {
     }
   }
 
-  const handleDownload = async (file: RemoteFile, mountId = workspace.activeMountId) => {
-    if (!mountId) return
-    try {
-      const transfer = await beginDownload(file, mountId)
-      if (!transfer) return
-      setTransfers((current) => [{
-        id: transfer.transferId,
-        name: file.name,
-        direction: 'download',
-        state: 'running',
-        bytesTransferred: 0,
-        totalBytes: transfer.localKind === 'file' && file.size > 0 ? file.size : null,
-        localKind: transfer.localKind,
-      }, ...current])
-      setTransferVisible(true)
+  const startDownload = async (
+    file: RemoteFile,
+    mountId: string,
+    targetDirectory: string,
+  ) => {
+    const transfer = await beginDownload(file, mountId, targetDirectory)
+    setTransfers((current) => [{
+      id: transfer.transferId,
+      name: file.name,
+      direction: 'download',
+      state: 'running',
+      bytesTransferred: 0,
+      totalBytes: transfer.localKind === 'file' && file.size > 0 ? file.size : null,
+      localKind: transfer.localKind,
+    }, ...current])
+    setTransferVisible(true)
 
+    const monitorDownload = async () => {
       try {
         const result = await transfer.result
         setTransfers((current) => current.map((item) => item.id === transfer.transferId
@@ -296,8 +344,71 @@ function App() {
           : item))
         showNotice(commandErrorMessage(error, '下载失败，请稍后重试。'))
       }
+    }
+    void monitorDownload()
+  }
+
+  const openDownloadDestination = (
+    file: RemoteFile,
+    mountId: string,
+    initialDirectory: string,
+    error = '',
+  ) => {
+    setPendingDownload({ file, mountId })
+    setDownloadDirectory(initialDirectory)
+    setDownloadError(error)
+    setModalKind('download')
+  }
+
+  const handleDownload = async (file: RemoteFile, mountId = workspace.activeMountId) => {
+    if (!mountId) return
+    let downloadSettings = settings
+    try {
+      if (!downloadSettings) {
+        downloadSettings = await koofr.getSettings()
+        setSettings(downloadSettings)
+      }
+      if (downloadSettings.askDownloadLocation) {
+        openDownloadDestination(file, mountId, downloadSettings.downloadDirectory)
+        return
+      }
+      await startDownload(file, mountId, downloadSettings.downloadDirectory)
     } catch (error) {
-      showNotice(commandErrorMessage(error, '无法选择保存位置。'))
+      const fallbackDirectory = downloadSettings?.downloadDirectory ?? ''
+      openDownloadDestination(
+        file,
+        mountId,
+        fallbackDirectory,
+        commandErrorMessage(error, '默认下载位置不可用，请选择其他文件夹。'),
+      )
+    }
+  }
+
+  const confirmDownload = async (targetDirectory: string, askEveryTime: boolean) => {
+    if (!pendingDownload) return
+    setDownloadBusy(true)
+    setDownloadError('')
+    try {
+      if (!askEveryTime || settings?.askDownloadLocation !== askEveryTime) {
+        setSettings(await koofr.updateDownloadSettings(targetDirectory, askEveryTime))
+      }
+      await startDownload(pendingDownload.file, pendingDownload.mountId, targetDirectory)
+      setModalKind(null)
+      setPendingDownload(null)
+    } catch (error) {
+      setDownloadError(commandErrorMessage(error, '无法使用这个下载位置，请检查路径后重试。'))
+    } finally {
+      setDownloadBusy(false)
+    }
+  }
+
+  const browseDownloadDirectory = async () => {
+    setDownloadError('')
+    try {
+      return await koofr.selectDownloadDirectory()
+    } catch (error) {
+      setDownloadError(commandErrorMessage(error, '无法打开下载文件夹选择器。'))
+      return null
     }
   }
 
@@ -378,18 +489,19 @@ function App() {
   const deleteFiles = async () => {
     if (!workspace.activeMountId || pendingFiles.length === 0) return
     setOperationBusy(true)
-    let deletedCount = 0
     try {
-      for (const file of pendingFiles) {
-        await koofr.deleteEntry(workspace.activeMountId, file.path)
-        deletedCount += 1
+      const results = await Promise.allSettled(
+        pendingFiles.map((file) => koofr.deleteEntry(workspace.activeMountId, file.path)),
+      )
+      const deletedCount = results.filter((result) => result.status === 'fulfilled').length
+      const failed = results.filter((result) => result.status === 'rejected')
+      setModalKind(null)
+      if (failed.length === 0) {
+        showNotice(`已删除 ${deletedCount} 个项目`)
+      } else {
+        const prefix = deletedCount > 0 ? `已删除 ${deletedCount} 个项目；` : ''
+        showNotice(`${prefix}${commandErrorMessage(failed[0]?.reason, '其余项目删除失败。')}`)
       }
-      setModalKind(null)
-      showNotice(`已删除 ${deletedCount} 个项目`)
-    } catch (error) {
-      setModalKind(null)
-      const prefix = deletedCount > 0 ? `已删除 ${deletedCount} 个项目；` : ''
-      showNotice(`${prefix}${commandErrorMessage(error, '其余项目删除失败。')}`)
     } finally {
       await workspace.refresh()
       setOperationBusy(false)
@@ -535,6 +647,14 @@ function App() {
               onDelete={openDelete}
             />
           )}
+          {transferVisible ? (
+            <button
+              className="transfer-panel-backdrop"
+              type="button"
+              aria-label="收起传输面板"
+              onClick={() => setTransferVisible(false)}
+            />
+          ) : null}
           <TransferPanel
             visible={transferVisible}
             items={transfers}
@@ -562,6 +682,23 @@ function App() {
       ) : null}
 
       {notice ? <div className="toast" role="status">{notice}</div> : null}
+
+      {authState === 'signedIn' && modalKind === 'download' && pendingDownload ? (
+        <DownloadDestinationDialog
+          fileName={pendingDownload.file.name}
+          initialDirectory={downloadDirectory}
+          initialAskEveryTime={settings?.askDownloadLocation ?? true}
+          busy={downloadBusy}
+          error={downloadError}
+          onBrowse={browseDownloadDirectory}
+          onClose={() => {
+            setModalKind(null)
+            setPendingDownload(null)
+            setDownloadError('')
+          }}
+          onConfirm={(directory, askEveryTime) => void confirmDownload(directory, askEveryTime)}
+        />
+      ) : null}
 
       {authState === 'signedIn' && modalKind === 'createFolder' ? (
         <Modal
@@ -634,12 +771,17 @@ function App() {
             loading={settingsLoading}
             busy={settingsBusy}
             error={settingsError}
+            downloadError={downloadSettingsError}
             onCacheModeChange={(cacheMode) => {
               if (settings) void updateCacheSettings(cacheMode, settings.cacheTtlMinutes)
             }}
             onCacheTtlChange={(cacheTtlMinutes) => {
               if (settings) void updateCacheSettings(settings.cacheMode, cacheTtlMinutes)
             }}
+            onDownloadSettingsChange={(directory, askDownloadLocation) => {
+              void updateDownloadSettings(directory, askDownloadLocation)
+            }}
+            onBrowseDownloadDirectory={browseSettingsDownloadDirectory}
             onClearCache={() => void clearMetadataCache()}
             onForgetLogin={() => void forgetSavedLogin()}
           />

@@ -2,6 +2,14 @@ import type { RemoteFile } from '../../types/backend'
 import type { FileKind } from '../../types/files'
 
 const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
+const MODIFIED_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 
 export function isDirectory(file: RemoteFile) {
   return file.entryType === 'dir' || file.entryType === 'folder'
@@ -42,14 +50,7 @@ export function formatModified(timestamp: number) {
   const milliseconds = timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp
   const date = new Date(milliseconds)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
+  return MODIFIED_DATE_FORMATTER.format(date)
 }
 
 export interface PathCrumb {

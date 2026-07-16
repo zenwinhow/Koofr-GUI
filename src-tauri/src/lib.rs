@@ -34,7 +34,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()?;
-            let settings = SettingsStore::load(data_dir.join("settings.json"));
+            let settings =
+                SettingsStore::load(data_dir.join("settings.json"), app.path().download_dir()?);
             let cache = MetadataCache::load(
                 data_dir.join("metadata-cache.json"),
                 settings.initial_cache_mode() == settings::CacheMode::Disk,
@@ -56,11 +57,15 @@ pub fn run() {
             commands::koofr_session,
             commands::get_settings,
             commands::update_settings,
+            commands::update_download_settings,
             commands::clear_metadata_cache,
             commands::forget_saved_login,
             commands::select_upload_file,
             commands::select_download_location,
+            commands::select_download_directory,
+            commands::prepare_download_location,
             folder_commands::select_download_folder,
+            folder_commands::prepare_download_folder,
             commands::list_mounts,
             commands::list_files,
             commands::list_recent,

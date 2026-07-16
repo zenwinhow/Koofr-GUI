@@ -3,26 +3,25 @@ import { koofr } from '../../services/koofr'
 import type { RemoteFile, TransferResult } from '../../types/backend'
 
 interface StartedDownload {
-  transferId: string
-  result: Promise<TransferResult>
-  localKind: 'file' | 'folder'
+  readonly transferId: string
+  readonly result: Promise<TransferResult>
+  readonly localKind: 'file' | 'folder'
 }
 
 export async function beginDownload(
   file: RemoteFile,
   mountId: string,
-): Promise<StartedDownload | null> {
+  downloadDirectory: string,
+): Promise<StartedDownload> {
   if (isDirectory(file)) {
-    const selection = await koofr.selectDownloadFolder(file.name)
-    if (!selection) return null
+    const selection = await koofr.prepareDownloadFolder(file.name, downloadDirectory)
     return {
       ...koofr.downloadFolder(mountId, file.path, selection.grantId),
       localKind: 'folder',
     }
   }
 
-  const selection = await koofr.selectDownloadLocation(file.name)
-  if (!selection) return null
+  const selection = await koofr.prepareDownloadLocation(file.name, downloadDirectory)
   return {
     ...koofr.downloadFile(mountId, file.path, selection.grantId),
     localKind: 'file',

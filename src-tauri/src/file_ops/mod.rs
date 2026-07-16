@@ -151,6 +151,29 @@ impl LocalUploadPath {
 pub struct LocalDownloadPath(PathBuf);
 
 impl LocalDownloadPath {
+    pub async fn from_parent(parent: PathBuf, name: &RemoteName) -> Result<Self, AppError> {
+        if !parent.is_absolute() {
+            return Err(AppError::InvalidInput("local download parent"));
+        }
+        let metadata = tokio::fs::symlink_metadata(&parent).await?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(AppError::InvalidInput("local download parent"));
+        }
+        let preferred = safe_suggested_file_name(name);
+        for index in 1_u64.. {
+            let candidate = if index == 1 {
+                preferred.clone()
+            } else {
+                numbered_file_name(&preferred, index)
+            };
+            let target = parent.join(candidate);
+            if !tokio::fs::try_exists(&target).await? {
+                return Self::from_selected(target).await;
+            }
+        }
+        unreachable!()
+    }
+
     pub async fn from_selected(path: PathBuf) -> Result<Self, AppError> {
         if !path.is_absolute() || path.file_name().is_none() {
             return Err(AppError::InvalidInput("local download path"));
@@ -181,6 +204,18 @@ impl LocalDownloadPath {
         Ok(self
             .0
             .with_file_name(format!(".{file_name}.koofr-part-{}", uuid::Uuid::new_v4())))
+    }
+}
+
+fn numbered_file_name(preferred: &str, index: u64) -> String {
+    let path = Path::new(preferred);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or(preferred);
+    match path.extension().and_then(|value| value.to_str()) {
+        Some(extension) => format!("{stem} ({index}).{extension}"),
+        None => format!("{stem} ({index})"),
     }
 }
 
@@ -228,7 +263,7 @@ pub fn safe_suggested_file_name(name: &RemoteName) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{MountId, RemoteName, RemotePath, safe_suggested_file_name};
+    use super::{LocalDownloadPath, MountId, RemoteName, RemotePath, safe_suggested_file_name};
 
     #[test]
     fn validates_mount_identifiers() {
@@ -276,5 +311,24 @@ mod tests {
     fn counts_non_bmp_names_as_two_utf16_units() {
         let too_long = "😀".repeat(128);
         assert!(RemoteName::parse(too_long).is_err());
+    }
+
+    #[tokio::test]
+    async fn chooses_a_numbered_file_name_instead_of_overwriting() {
+        // Given
+        let directory =
+            std::env::temp_dir().join(format!("koofr-download-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).expect("create downloads directory");
+        std::fs::write(directory.join("report.pdf"), b"existing").expect("create existing file");
+        let name = RemoteName::parse("report.pdf".to_owned()).expect("valid remote name");
+
+        // When
+        let target = LocalDownloadPath::from_parent(directory.clone(), &name)
+            .await
+            .expect("choose available target");
+
+        // Then
+        assert_eq!(target.as_path(), directory.join("report (2).pdf"));
+        std::fs::remove_dir_all(directory).expect("remove downloads directory");
     }
 }

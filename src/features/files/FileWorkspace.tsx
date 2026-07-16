@@ -17,7 +17,7 @@ import {
   Trash2,
   UploadCloud,
 } from 'lucide-react'
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import type { KoofrMount, RemoteFile } from '../../types/backend'
 import type { FileKind } from '../../types/files'
 import {
@@ -93,10 +93,29 @@ export function FileWorkspace({
     ids: EMPTY_SELECTION,
   })
   const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement>(null)
   const deferredQuery = useDeferredValue(query)
   const scope = `${activeMountId}:${path}`
   const selectedIds = selection.scope === scope ? selection.ids : EMPTY_SELECTION
   const activeMount = mounts.find((mount) => mount.id === activeMountId)
+
+  useEffect(() => {
+    if (!newMenuOpen) return
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && !newMenuRef.current?.contains(event.target)) {
+        setNewMenuOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNewMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [newMenuOpen])
 
   const visibleFiles = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLocaleLowerCase('zh-CN')
@@ -181,18 +200,20 @@ export function FileWorkspace({
           <button className="primary-button" type="button" onClick={onUpload} disabled={!activeMountId || loading}>
             <UploadCloud size={18} />上传
           </button>
-          <div className="menu-anchor">
+          <div className="menu-anchor" ref={newMenuRef}>
             <button
               className="secondary-button"
               type="button"
               disabled={!activeMountId || loading}
+              aria-haspopup="menu"
+              aria-expanded={newMenuOpen}
               onClick={() => setNewMenuOpen((open) => !open)}
             >
               新建<ChevronDown size={16} />
             </button>
             {newMenuOpen ? (
-              <div className="new-menu">
-                <button type="button" onClick={() => { onCreateFolder(); setNewMenuOpen(false) }}>
+              <div className="new-menu" role="menu">
+                <button role="menuitem" type="button" onClick={() => { onCreateFolder(); setNewMenuOpen(false) }}>
                   <Folder size={17} />新建文件夹
                 </button>
               </div>

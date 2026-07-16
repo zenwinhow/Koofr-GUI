@@ -1,16 +1,20 @@
-import { Ban, Database, HardDrive, KeyRound, MemoryStick, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ban, Database, Download, FolderOpen, HardDrive, KeyRound, MemoryStick, ShieldCheck, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { AppSettings, CacheMode } from '../../types/backend'
 import { formatBytes } from '../files/filePresentation'
 
 interface SettingsPanelProps {
-  settings: AppSettings | null
-  loading: boolean
-  busy: boolean
-  error: string
-  onCacheModeChange: (mode: CacheMode) => void
-  onCacheTtlChange: (minutes: number) => void
-  onClearCache: () => void
-  onForgetLogin: () => void
+  readonly settings: AppSettings | null
+  readonly loading: boolean
+  readonly busy: boolean
+  readonly error: string
+  readonly downloadError: string
+  readonly onCacheModeChange: (mode: CacheMode) => void
+  readonly onCacheTtlChange: (minutes: number) => void
+  readonly onDownloadSettingsChange: (directory: string, askDownloadLocation: boolean) => void
+  readonly onBrowseDownloadDirectory: () => Promise<string | null>
+  readonly onClearCache: () => void
+  readonly onForgetLogin: () => void
 }
 
 const CACHE_OPTIONS = [
@@ -44,17 +48,119 @@ export function SettingsPanel({
   loading,
   busy,
   error,
+  downloadError,
   onCacheModeChange,
   onCacheTtlChange,
+  onDownloadSettingsChange,
+  onBrowseDownloadDirectory,
   onClearCache,
   onForgetLogin,
 }: SettingsPanelProps) {
+  const [downloadDirectory, setDownloadDirectory] = useState(settings?.downloadDirectory ?? '')
+  const [browsing, setBrowsing] = useState(false)
+
+  useEffect(() => {
+    if (settings) setDownloadDirectory(settings.downloadDirectory)
+  }, [settings])
+
   if (loading || !settings) {
     return <div className="settings-loading"><span className="auth-spinner" />正在读取本地设置…</div>
   }
 
+  const normalizedDownloadDirectory = downloadDirectory.trim()
+  const downloadDirectoryChanged = normalizedDownloadDirectory !== settings.downloadDirectory
+  const browseDownloadDirectory = async () => {
+    setBrowsing(true)
+    try {
+      const selected = await onBrowseDownloadDirectory()
+      if (selected) {
+        setDownloadDirectory(selected)
+        onDownloadSettingsChange(selected, settings.askDownloadLocation)
+      }
+    } finally {
+      setBrowsing(false)
+    }
+  }
+
   return (
     <div className="settings-panel">
+      <section className="settings-section settings-section--download">
+        <header className="settings-section__heading">
+          <Download aria-hidden="true" />
+          <div>
+            <h3>下载</h3>
+            <p>设置默认保存位置，以及下载前是否再次确认。</p>
+          </div>
+        </header>
+
+        <div className="settings-path-field">
+          <label htmlFor="settings-download-directory">默认下载位置</label>
+          <span className="path-field__control">
+            <input
+              id="settings-download-directory"
+              value={downloadDirectory}
+              disabled={busy}
+              aria-invalid={downloadError ? true : undefined}
+              aria-describedby={downloadError ? 'settings-download-error' : 'settings-download-hint'}
+              onChange={(event) => setDownloadDirectory(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && normalizedDownloadDirectory) {
+                  onDownloadSettingsChange(normalizedDownloadDirectory, settings.askDownloadLocation)
+                }
+              }}
+            />
+            <button
+              type="button"
+              aria-label="选择默认下载文件夹"
+              title="选择文件夹"
+              disabled={busy || browsing}
+              onClick={() => void browseDownloadDirectory()}
+            >
+              <FolderOpen aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+        <div className="settings-path-actions">
+          <small id="settings-download-hint">可直接填写完整路径，也可以使用右侧按钮选择。</small>
+          <button
+            type="button"
+            disabled={busy || !downloadDirectoryChanged || !normalizedDownloadDirectory}
+            onClick={() => onDownloadSettingsChange(
+              normalizedDownloadDirectory,
+              settings.askDownloadLocation,
+            )}
+          >
+            保存路径
+          </button>
+        </div>
+        {downloadError ? (
+          <p className="field-message field-message--error" id="settings-download-error" role="alert">
+            {downloadError}
+          </p>
+        ) : null}
+
+        <div className="settings-switch-row">
+          <span>
+            <strong>每次下载前询问保存位置</strong>
+            <small>关闭后将直接下载到上面的默认文件夹。</small>
+          </span>
+          <button
+            className={`settings-switch${settings.askDownloadLocation ? ' settings-switch--on' : ''}`}
+            type="button"
+            role="switch"
+            aria-checked={settings.askDownloadLocation}
+            aria-label="每次下载前询问保存位置"
+            disabled={busy || !normalizedDownloadDirectory}
+            onClick={() => onDownloadSettingsChange(
+              normalizedDownloadDirectory,
+              !settings.askDownloadLocation,
+            )}
+          >
+            <span aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+
       <section className="settings-section">
         <header className="settings-section__heading">
           <Database aria-hidden="true" />
