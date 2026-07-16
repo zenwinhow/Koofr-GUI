@@ -116,4 +116,4 @@ Rust + Tauri core (`src-tauri/src/`)
 - 下载目录可以由用户在界面中明确填写，但前端不能拼接最终文件名；Rust 必须验证父目录、清理远端名称、避免覆盖并签发一次性下载授权。
 - Vault 功能必须兼容 Koofr/rclone crypt，不能创建自定义加密格式。
 
-推送与版本号完全匹配的 `v*` 标签会触发 GitHub Actions：执行质量检查、导入代码签名证书、构建 NSIS 安装程序并创建同名 GitHub Release。发布所需机密、版本规则和操作步骤见 [发布流程](docs/RELEASING.md)。正式版不会上传未签名安装程序。
+推送与版本号完全匹配的 `v*` 标签会触发 GitHub Actions：执行质量检查、构建 NSIS 安装程序并创建同名 GitHub Release。发布包目前不进行代码签名；Windows 可能显示未知发布者或 SmartScreen 警告，用户应仅从本仓库 Release 页面下载。版本规则和操作步骤见 [发布流程](docs/RELEASING.md)。

@@ -86,7 +86,7 @@ npm run build:desktop
 src-tauri/target/release/koofr-gui.exe
 ```
 
-`src-tauri/tauri.conf.json` 启用了 NSIS 打包；构建会生成可执行文件和 `src-tauri/target/release/bundle/nsis/` 下的安装程序。本地构建不会导入发布证书，因此不要把未签名的本地安装程序当作正式发布包。正式发布由 GitHub Actions 构建并签名，具体步骤见 [发布流程](RELEASING.md)。
+`src-tauri/tauri.conf.json` 启用了 NSIS 打包；构建会生成可执行文件和 `src-tauri/target/release/bundle/nsis/` 下的安装程序。GitHub Actions 使用同一构建流程创建公开 Release，但发布包不进行代码签名，因此 Windows 可能显示未知发布者或 SmartScreen 警告。具体步骤见 [发布流程](RELEASING.md)。
 
 ## 5. 质量检查
 

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Build and publish signed Windows installer
+    name: Build and publish Windows installer
     runs-on: windows-latest
 
     steps:
@@ -56,29 +56,6 @@ jobs:
       - name: Run release checks
         run: npm run check
 
-      - name: Import Windows code-signing certificate
-        shell: powershell
-        env:
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            throw "WINDOWS_CERTIFICATE and WINDOWS_CERTIFICATE_PASSWORD GitHub secrets are required for a formal release."
-          }
-
-          $certificatePath = Join-Path $env:RUNNER_TEMP "koofr-gui-release.pfx"
-          [System.IO.File]::WriteAllBytes($certificatePath, [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
-          try {
-            $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
-            $certificate = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $password
-            if ($null -eq $certificate -or -not $certificate.HasPrivateKey) {
-              throw "The imported certificate does not contain a private key."
-            }
-          }
-          finally {
-            Remove-Item -LiteralPath $certificatePath -Force -ErrorAction SilentlyContinue
-          }
-
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v1
         env:
@@ -89,4 +66,3 @@ jobs:
           releaseBody: See CHANGELOG.md for release notes.
           releaseDraft: false
           prerelease: false
-          args: --config src-tauri/tauri.release.conf.json
