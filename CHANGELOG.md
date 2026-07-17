@@ -4,6 +4,13 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [1.2.0] - 2026-07-17
+
+### 鍙樻洿
+
+- Add sharing-link management for querying, creating, copying, and confirming revocation of download and file-receiving links
+- Detect existing Koofr, Google Drive, OneDrive, Dropbox, and other connected storage mounts
+
 ## [1.1.0] - 2026-07-17
 
 ### 变更
