@@ -12,6 +12,7 @@ const defaultCallbacks = {
   onThemeOpen: vi.fn(),
   onUpload: vi.fn(),
   onDownload: vi.fn(),
+  onShare: vi.fn(),
   onRename: vi.fn(),
   onDelete: vi.fn(),
 }
@@ -72,5 +73,37 @@ describe('FileWorkspace', () => {
     // Then
     expect(new Set([...container.querySelectorAll('[data-file-kind]')].map((node) => node.getAttribute('data-file-kind'))))
       .toEqual(new Set(['folder', 'file', 'xlsx', 'image', 'pdf', 'docx', 'archive', 'executable']))
+  })
+
+  it('shares the selected file instead of asking for a path', async () => {
+    const user = userEvent.setup()
+    const file: RemoteFile = {
+      name: 'report.pdf',
+      entryType: 'file',
+      modified: 0,
+      size: 10,
+      contentType: 'application/pdf',
+      hash: '',
+      path: '/Documents/report.pdf',
+    }
+    const onShare = vi.fn()
+    render(
+      <FileWorkspace
+        mounts={[]}
+        activeMountId="mount-1"
+        path="/Documents"
+        files={[file]}
+        loading={false}
+        error=""
+        lastSyncedAt={null}
+        {...defaultCallbacks}
+        onShare={onShare}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '选择 report.pdf' }))
+    await user.click(screen.getByRole('button', { name: '分享' }))
+
+    expect(onShare).toHaveBeenCalledWith(file)
   })
 })

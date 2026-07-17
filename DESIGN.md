@@ -130,7 +130,7 @@ All spacing derives from a 4px base.
 
 ### Share and connection management
 
-- **Structure**: sidebar entry → wide modal → compact creation or management section → grouped records.
+- **Structure**: file selection → Share action → compact creation dialog; sidebar entry → wide management modal → grouped records.
 - **Link states**: loading, empty, ready, validation error, creating, copied, revoke confirmation, and revoked.
 - **Connected storage states**: online, offline, known provider, and generic external provider.
 - **Safety**: destructive link revocation requires an explicit second click. Third-party authorization stays on Koofr's official account surface until a public desktop API exists.

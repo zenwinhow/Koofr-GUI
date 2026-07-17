@@ -1,10 +1,10 @@
-import { Clipboard, Copy, Download, Link2, LoaderCircle, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Clipboard, Copy, Download, LoaderCircle, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Modal } from '../../components/Modal'
 import { commandErrorMessage } from '../../services/koofr'
 import { publicLinks } from '../../services/publicLinks'
-import type { KoofrMount, PublicLink, PublicLinkKind } from '../../types/backend'
+import type { KoofrMount, PublicLink } from '../../types/backend'
 
 interface ShareLinksDialogProps {
   readonly mounts: readonly KoofrMount[]
@@ -15,23 +15,15 @@ function initialMountId(mounts: readonly KoofrMount[]) {
   return mounts.find((mount) => mount.isPrimary)?.id ?? mounts[0]?.id ?? ''
 }
 
-function isCanonicalPath(path: string) {
-  if (!path.startsWith('/') || (path.length > 1 && path.endsWith('/'))) return false
-  return path === '/' || path.slice(1).split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..')
-}
-
 export function ShareLinksDialog({ mounts, onClose }: ShareLinksDialogProps) {
   const [mountId, setMountId] = useState(() => initialMountId(mounts))
   const [links, setLinks] = useState<PublicLink[]>([])
-  const [path, setPath] = useState('/')
-  const [kind, setKind] = useState<PublicLinkKind>('download')
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmingId, setConfirmingId] = useState('')
   const [copiedId, setCopiedId] = useState('')
 
-  const selectedMount = mounts.find((mount) => mount.id === mountId)
   const groupedLinks = useMemo(() => ({
     download: links.filter((link) => link.kind === 'download'),
     upload: links.filter((link) => link.kind === 'upload'),
@@ -55,23 +47,6 @@ export function ShareLinksDialog({ mounts, onClose }: ShareLinksDialogProps) {
   useEffect(() => {
     void loadLinks()
   }, [loadLinks])
-
-  const createLink = async () => {
-    if (!mountId || !isCanonicalPath(path)) {
-      setError('请输入以 / 开头且不以 / 结尾的 Koofr 路径。')
-      return
-    }
-    setBusy(true)
-    setError('')
-    try {
-      const created = await publicLinks.create(mountId, path, kind)
-      setLinks((current) => [created, ...current.filter((link) => link.id !== created.id)])
-    } catch (createError) {
-      setError(commandErrorMessage(createError, '无法创建分享链接。'))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const removeLink = async (link: PublicLink) => {
     if (confirmingId !== link.id) {
@@ -103,44 +78,20 @@ export function ShareLinksDialog({ mounts, onClose }: ShareLinksDialogProps) {
   return (
     <Modal title="分享链接" actionLabel="完成" onClose={onClose} wide>
       <div className="share-links-dialog">
-        <section className="share-link-create" aria-label="创建分享链接">
-          <div className="share-link-create__heading">
-            <span>
-              <Link2 aria-hidden="true" />
-              <span>
-                <strong>新建链接</strong>
-                <small>发送文件，或允许他人向指定文件夹上传。</small>
-              </span>
-            </span>
-            <button className="icon-button icon-button--bordered" type="button" aria-label="刷新分享链接" disabled={loading || busy || !mountId} onClick={() => void loadLinks()}>
-              <RefreshCw aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="share-link-create__fields">
-            <label>
-              存储位置
-              <select value={mountId} onChange={(event) => setMountId(event.target.value)} disabled={busy}>
-                {mounts.map((mount) => <option key={mount.id} value={mount.id}>{mount.name}</option>)}
-              </select>
-            </label>
-            <label>
-              链接类型
-              <select value={kind} onChange={(event) => setKind(event.target.value as PublicLinkKind)} disabled={busy}>
-                <option value="download">下载 / 发送链接</option>
-                <option value="upload">上传 / 接收文件链接</option>
-              </select>
-            </label>
-            <label className="share-link-create__path">
-              Koofr 路径
-              <input value={path} onChange={(event) => setPath(event.target.value)} aria-invalid={!isCanonicalPath(path)} placeholder="/文件或文件夹" disabled={busy} />
-            </label>
-            <button className="primary-button" type="button" disabled={busy || loading || !mountId || !isCanonicalPath(path)} onClick={() => void createLink()}>
-              {busy ? <LoaderCircle className="spin" aria-hidden="true" /> : kind === 'download' ? <Download aria-hidden="true" /> : <Upload aria-hidden="true" />}
-              创建链接
-            </button>
-          </div>
-          <small className="share-link-create__hint">当前位置：{selectedMount?.name ?? '未选择'}。接收文件链接需要指向文件夹。</small>
+        <section className="share-link-management" aria-label="分享链接管理">
+          <span>
+            <strong>已有链接</strong>
+            <small>创建新链接时，请先在“我的文件”中选中文件或文件夹，再点击“分享”。</small>
+          </span>
+          <label>
+            存储位置
+            <select value={mountId} onChange={(event) => setMountId(event.target.value)} disabled={busy}>
+              {mounts.map((mount) => <option key={mount.id} value={mount.id}>{mount.name}</option>)}
+            </select>
+          </label>
+          <button className="secondary-button" type="button" disabled={loading || busy || !mountId} onClick={() => void loadLinks()}>
+            <RefreshCw aria-hidden="true" />刷新
+          </button>
         </section>
 
         {error ? <p className="settings-error" role="alert">{error}</p> : null}
