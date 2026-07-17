@@ -28,6 +28,14 @@ Koofr-GUI should feel like a calm Windows file manager: compact, dependable, and
 | Status/error-soft | `--status-error-soft` | `#fff1ef` | Error background |
 | Status/warning | `--status-warning` | `#8a6330` | Cautionary notes |
 | Overlay | `--overlay` | `rgba(20, 23, 28, 0.28)` | Modal backdrop |
+| File/folder | `--file-folder`, `--file-folder-deep` | `#f4be42`, `#c9820f` | Layered folder glyph |
+| File/spreadsheet | `--file-sheet`, `--file-sheet-deep` | `#278b5b`, `#17633f` | Spreadsheet glyph |
+| File/PDF | `--file-pdf`, `--file-pdf-deep` | `#df5149`, `#ac322d` | PDF glyph |
+| File/document | `--file-doc`, `--file-doc-deep` | `#3979c7`, `#285891` | Text-document glyph |
+| File/image | `--file-image`, `--file-image-deep` | `#765ac2`, `#563d9c` | Image glyph |
+| File/archive | `--file-archive`, `--file-archive-deep` | `#b0712b`, `#7d4b18` | Compressed archive glyph |
+| File/executable | `--file-executable`, `--file-executable-deep` | `#397b91`, `#245264` | Windows executable and script glyph |
+| File/generic | `--file-generic`, `--file-generic-deep` | `#74808d`, `#4d5864` | Unknown-file glyph |
 
 ### Theme accents
 
@@ -122,6 +130,14 @@ All spacing derives from a 4px base.
 - **Structure**: header, status tabs, transfer list, per-item controls, footer.
 - **States**: open, hidden, empty, running, completed, failed, cancelled.
 - **Accessibility**: live transfer values remain textual; action buttons have explicit labels.
+
+### File type icon
+
+- **Structure**: a reusable 36x38 inline SVG with a layered folder or folded document silhouette and a type-specific interior mark.
+- **Variants**: folder, spreadsheet, PDF, text document, image, archive, executable, and generic file.
+- **Color**: semantic file colors remain stable across accent themes; tinted paper surfaces are derived from the declared file tokens and `--surface`.
+- **States**: the icon itself is non-interactive and inherits row selection/hover without decorative animation.
+- **Accessibility**: decorative only (`aria-hidden`); the adjacent filename supplies the accessible name.
 
 ## 6. Motion & Interaction
 

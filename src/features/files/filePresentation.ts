@@ -2,6 +2,12 @@ import type { RemoteFile } from '../../types/backend'
 import type { FileKind } from '../../types/files'
 
 const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
+const ARCHIVE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'tgz', 'tbz2', 'txz',
+])
+const EXECUTABLE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'exe', 'msi', 'msix', 'appx', 'bat', 'cmd', 'com', 'ps1',
+])
 const MODIFIED_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
   month: '2-digit',
@@ -19,7 +25,9 @@ export function fileKind(file: RemoteFile): FileKind {
   if (isDirectory(file)) return 'folder'
   if (file.contentType.startsWith('image/')) return 'image'
 
-  const extension = file.name.split('.').pop()?.toLocaleLowerCase('en-US')
+  const extension = file.name.split('.').pop()?.toLocaleLowerCase('en-US') ?? ''
+  if (ARCHIVE_EXTENSIONS.has(extension)) return 'archive'
+  if (EXECUTABLE_EXTENSIONS.has(extension)) return 'executable'
   if (extension === 'xlsx' || extension === 'xls' || extension === 'ods') return 'xlsx'
   if (extension === 'pdf') return 'pdf'
   if (extension === 'docx' || extension === 'doc' || extension === 'odt') return 'docx'
