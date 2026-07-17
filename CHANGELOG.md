@@ -4,6 +4,15 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [1.1.0] - 2026-07-17
+
+### 变更
+
+- Add reusable inline SVG icons for folders and supported file types
+- Detect archive and executable extensions in file listings
+- Apply semantic icon tokens and document the new design variants
+- Add coverage for all supported file kinds
+
 ## [1.0.0] - 2026-07-16
 
 ### 新增
