@@ -607,6 +607,7 @@ function App() {
             storageName={activeMount?.name ?? ''}
             storageUsed={activeMount?.spaceUsed ?? null}
             storageTotal={activeMount?.spaceTotal ?? null}
+            mounts={workspace.mounts}
           />
           {isCollectionView(activeItem) ? (
             <CollectionWorkspace

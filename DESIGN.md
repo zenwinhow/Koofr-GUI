@@ -27,6 +27,9 @@ Koofr-GUI should feel like a calm Windows file manager: compact, dependable, and
 | Status/error | `--status-error` | `#b33d37` | Error messages and destructive feedback |
 | Status/error-soft | `--status-error-soft` | `#fff1ef` | Error background |
 | Status/warning | `--status-warning` | `#8a6330` | Cautionary notes |
+| Provider/Google | `--provider-google` | `#e6ad27` | Google Drive connection identifier |
+| Provider/OneDrive | `--provider-onedrive` | `#3979c7` | OneDrive connection identifier |
+| Provider/Dropbox | `--provider-dropbox` | `#236dc9` | Dropbox connection identifier |
 | Overlay | `--overlay` | `rgba(20, 23, 28, 0.28)` | Modal backdrop |
 | File/folder | `--file-folder`, `--file-folder-deep` | `#f4be42`, `#c9820f` | Layered folder glyph |
 | File/spreadsheet | `--file-sheet`, `--file-sheet-deep` | `#278b5b`, `#17633f` | Spreadsheet glyph |
@@ -124,6 +127,14 @@ All spacing derives from a 4px base.
 - **Structure**: copy block plus native button with `role="switch"` and visible track/thumb.
 - **States**: off, on, hover, focus, disabled.
 - **Accessibility**: `aria-checked` reflects the persisted setting.
+
+### Share and connection management
+
+- **Structure**: sidebar entry → wide modal → compact creation or management section → grouped records.
+- **Link states**: loading, empty, ready, validation error, creating, copied, revoke confirmation, and revoked.
+- **Connected storage states**: online, offline, known provider, and generic external provider.
+- **Safety**: destructive link revocation requires an explicit second click. Third-party authorization stays on Koofr's official account surface until a public desktop API exists.
+- **Accessibility**: persistent form labels, selectable read-only URLs, named refresh/revoke controls, and status/error announcements.
 
 ### Transfer panel
 

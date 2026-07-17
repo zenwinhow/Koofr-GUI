@@ -5,6 +5,7 @@ mod file_ops;
 mod folder_commands;
 mod folder_download;
 mod koofr_api;
+mod link_commands;
 mod local_access;
 mod local_open;
 mod metadata_cache;
@@ -71,6 +72,9 @@ pub fn run() {
             commands::list_recent,
             commands::list_shared,
             commands::list_trash,
+            link_commands::list_public_links,
+            link_commands::create_public_link,
+            link_commands::delete_public_link,
             commands::restore_trash,
             commands::empty_trash,
             commands::create_folder,

@@ -1,4 +1,5 @@
 mod models;
+mod public_links;
 
 use std::{collections::HashSet, time::Duration};
 
@@ -17,6 +18,7 @@ use models::{
     FileListResponse, MountListResponse, SearchResponse, SharedListResponse, TokenResponse,
     TrashListResponse,
 };
+pub use public_links::{PublicLink, PublicLinkKind};
 
 const USER_AGENT: &str = concat!("Koofr-GUI/", env!("CARGO_PKG_VERSION"));
 

@@ -3,7 +3,8 @@
 当前后端实现普通 Koofr 文件管理的首个可测试切片：
 
 - `src/file_ops/`：挂载点 ID、远程路径、远程名称和本地选择路径的校验。
-- `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除及内容请求。
+- `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除、内容请求及基础分享链接请求。
+- `src/link_commands.rs`：下载链接与接收文件链接的查询、创建和撤销命令。
 - `src/transfer/`、`src/folder_download.rs`：流式上传/下载、递归目录清单、进度事件、取消和下载临时内容清理。
 - `src/commands.rs`：暴露给 WebView 的窄范围 Tauri 命令。
 - `src/crypto/`、`src/vault_core/`：仍为空，Vault 尚未实现。
@@ -39,6 +40,7 @@
 `select_download_location`、`select_download_folder`、`select_download_directory`、
 `prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
+`list_public_links`、`create_public_link`、`delete_public_link`、
 `empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
 `delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`。
 
