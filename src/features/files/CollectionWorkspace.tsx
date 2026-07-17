@@ -2,11 +2,7 @@ import {
   ArrowDownToLine,
   Check,
   Clock3,
-  File,
-  FileImage,
-  FileSpreadsheet,
   FileText,
-  Folder,
   FolderOpen,
   LayoutList,
   Palette,
@@ -17,8 +13,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useDeferredValue, useMemo, useState } from 'react'
+import { FileTypeIcon } from '../../components/FileTypeIcon'
 import type { LocatedFile, RemoteFile, TrashItem } from '../../types/backend'
-import type { FileKind } from '../../types/files'
 import type { CollectionView } from './useKoofrCollections'
 import { fileKind, formatBytes, formatModified, isDirectory } from './filePresentation'
 
@@ -42,15 +38,6 @@ interface CollectionWorkspaceProps {
 }
 
 const EMPTY_SELECTION = new Set<string>()
-
-const fileGlyphs: Record<FileKind, typeof Folder> = {
-  folder: Folder,
-  xlsx: FileSpreadsheet,
-  pdf: FileText,
-  docx: FileText,
-  image: FileImage,
-  file: File,
-}
 
 const viewDetails = {
   最近的文件: {
@@ -285,7 +272,6 @@ export function CollectionWorkspace({
           const id = locatedId(file)
           const selected = selectedIds.has(id)
           const directory = isDirectory(file)
-          const Icon = fileGlyphs[fileKind(file)]
           const direction = file.shareDirection === 'received' ? '共享给我' : file.shareDirection === 'outgoing' ? '我已共享' : null
           return (
             <div className={`file-row collection-row${selected ? ' file-row--selected' : ''}`} role="row" key={id}>
@@ -293,7 +279,7 @@ export function CollectionWorkspace({
                 {selected ? <Check size={13} /> : null}
               </button>
               <button className="file-name file-name--button" type="button" onClick={() => directory ? onOpenLocation(file) : toggleSelection(id)} onDoubleClick={() => directory ? onOpenLocation(file) : onDownload(file)}>
-                <span className={`file-glyph file-glyph--${fileKind(file)}`}><Icon size={22} strokeWidth={1.8} /></span>
+                <FileTypeIcon kind={fileKind(file)} />
                 <strong>{file.name}</strong>
               </button>
               <span className="collection-location">{direction ? <em>{direction}</em> : null}{locationLabel(file)}</span>
@@ -308,14 +294,13 @@ export function CollectionWorkspace({
           const selected = selectedIds.has(item.versionId)
           const file = trashAsFile(item)
           const kind = fileKind(file)
-          const Icon = fileGlyphs[kind]
           return (
             <div className={`file-row collection-row${selected ? ' file-row--selected' : ''}`} role="row" key={item.versionId}>
               <button className={`checkbox${selected ? ' checkbox--checked' : ''}`} type="button" onClick={() => toggleSelection(item.versionId)} aria-label={`${selected ? '取消选择' : '选择'} ${item.name}`}>
                 {selected ? <Check size={13} /> : null}
               </button>
               <button className="file-name file-name--button" type="button" onClick={() => toggleSelection(item.versionId)}>
-                <span className={`file-glyph file-glyph--${kind}`}><Icon size={22} strokeWidth={1.8} /></span>
+                <FileTypeIcon kind={kind} />
                 <strong>{item.name}</strong>
               </button>
               <span className="collection-location">{item.mountName || '存储位置'}{parentPath(item.path)}</span>

@@ -1,6 +1,14 @@
 import type { TransferDirection, TransferState } from './backend'
 
-export type FileKind = 'folder' | 'xlsx' | 'pdf' | 'docx' | 'image' | 'file'
+export type FileKind =
+  | 'folder'
+  | 'xlsx'
+  | 'pdf'
+  | 'docx'
+  | 'image'
+  | 'archive'
+  | 'executable'
+  | 'file'
 
 export interface TransferItem {
   id: string

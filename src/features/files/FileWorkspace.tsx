@@ -4,9 +4,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  File,
-  FileImage,
-  FileSpreadsheet,
   FileText,
   Folder,
   LayoutList,
@@ -18,8 +15,8 @@ import {
   UploadCloud,
 } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { FileTypeIcon } from '../../components/FileTypeIcon'
 import type { KoofrMount, RemoteFile } from '../../types/backend'
-import type { FileKind } from '../../types/files'
 import {
   fileKind,
   formatBytes,
@@ -48,15 +45,6 @@ interface FileWorkspaceProps {
 }
 
 const EMPTY_SELECTION = new Set<string>()
-
-const fileGlyphs: Record<FileKind, typeof Folder> = {
-  folder: Folder,
-  xlsx: FileSpreadsheet,
-  pdf: FileText,
-  docx: FileText,
-  image: FileImage,
-  file: File,
-}
 
 function directoryHeading(path: string, activeMount?: KoofrMount) {
   if (path === '/') return activeMount?.name || '我的文件'
@@ -264,7 +252,7 @@ export function FileWorkspace({
           <div className="file-row file-row--parent" role="row">
             <span aria-hidden="true" />
             <button className="file-name file-name--button" type="button" onClick={() => onNavigate(parentDirectory(path))}>
-              <span className="file-glyph file-glyph--folder"><Folder size={22} strokeWidth={1.8} /></span>
+              <FileTypeIcon kind="folder" />
               <strong>..</strong>
             </button>
             <span>返回上一级目录</span>
@@ -278,7 +266,6 @@ export function FileWorkspace({
 
         {visibleFiles.map((file) => {
           const kind = fileKind(file)
-          const Icon = fileGlyphs[kind]
           const selected = selectedIds.has(file.path)
           const directory = isDirectory(file)
           return (
@@ -297,7 +284,7 @@ export function FileWorkspace({
                 onDoubleClick={() => directory ? onNavigate(file.path) : onDownload(file)}
                 onClick={() => directory ? onNavigate(file.path) : toggleSelection(file.path)}
               >
-                <span className={`file-glyph file-glyph--${kind}`}><Icon size={22} strokeWidth={1.8} /></span>
+                <FileTypeIcon kind={kind} />
                 <strong>{file.name}</strong>
               </button>
               <span>我</span>

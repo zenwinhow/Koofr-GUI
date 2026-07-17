@@ -23,6 +23,22 @@
   --status-error-soft: #fff1ef;
   --status-warning: #8a6330;
   --overlay: rgba(20, 23, 28, .28);
+  --file-folder: #f4be42;
+  --file-folder-deep: #c9820f;
+  --file-sheet: #278b5b;
+  --file-sheet-deep: #17633f;
+  --file-pdf: #df5149;
+  --file-pdf-deep: #ac322d;
+  --file-doc: #3979c7;
+  --file-doc-deep: #285891;
+  --file-image: #765ac2;
+  --file-image-deep: #563d9c;
+  --file-archive: #b0712b;
+  --file-archive-deep: #7d4b18;
+  --file-executable: #397b91;
+  --file-executable-deep: #245264;
+  --file-generic: #74808d;
+  --file-generic-deep: #4d5864;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -801,12 +817,59 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .file-name strong { font-weight: 540; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-name--button { width: 100%; padding: 7px 4px; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: 6px; }
 .file-name--button:hover { color: var(--accent-dark); }
+.file-type-icon {
+  width: 36px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  --file-icon-main: var(--file-generic);
+  --file-icon-deep: var(--file-generic-deep);
+  --file-icon-paper: color-mix(in srgb, var(--file-icon-main) 10%, var(--surface));
+}
+.file-type-icon svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.file-type-icon--xlsx { --file-icon-main: var(--file-sheet); --file-icon-deep: var(--file-sheet-deep); }
+.file-type-icon--pdf { --file-icon-main: var(--file-pdf); --file-icon-deep: var(--file-pdf-deep); }
+.file-type-icon--docx { --file-icon-main: var(--file-doc); --file-icon-deep: var(--file-doc-deep); }
+.file-type-icon--image { --file-icon-main: var(--file-image); --file-icon-deep: var(--file-image-deep); }
+.file-type-icon--archive { --file-icon-main: var(--file-archive); --file-icon-deep: var(--file-archive-deep); }
+.file-type-icon--executable { --file-icon-main: var(--file-executable); --file-icon-deep: var(--file-executable-deep); }
+.file-type-icon__paper {
+  fill: var(--file-icon-paper);
+  stroke: color-mix(in srgb, var(--file-icon-deep) 68%, var(--border));
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.file-type-icon__fold {
+  fill: color-mix(in srgb, var(--file-icon-main) 28%, var(--surface));
+  stroke: color-mix(in srgb, var(--file-icon-deep) 68%, var(--border));
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.file-type-icon__sheen { fill: none; stroke: var(--surface); stroke-width: 1.2; stroke-linecap: round; opacity: .7; }
+.file-type-icon__badge { fill: var(--file-icon-main); }
+.file-type-icon__detail {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.file-type-icon__detail-fill { fill: color-mix(in srgb, var(--surface) 86%, var(--file-icon-main)); }
+.file-type-icon__pdf-mark {
+  fill: none;
+  stroke: var(--file-icon-main);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.file-type-icon__generic-dot { fill: var(--file-icon-main); }
+.file-type-icon__generic-line { fill: none; stroke: var(--file-icon-deep); stroke-width: 1.5; stroke-linecap: round; opacity: .82; }
+.file-type-icon__folder-back { fill: var(--file-folder-deep); }
+.file-type-icon__folder-tab { fill: color-mix(in srgb, var(--file-folder) 62%, var(--surface)); }
+.file-type-icon__folder-front { fill: var(--file-folder); stroke: var(--file-folder-deep); stroke-width: 1.1; stroke-linejoin: round; }
+.file-type-icon__folder-highlight { fill: none; stroke: var(--surface); stroke-width: 1.1; stroke-linecap: round; opacity: .48; }
 .file-glyph { width: 32px; height: 34px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
-.file-glyph--folder { color: #d99c11; background: #fff2c5; }
-.file-glyph--xlsx { color: #167f55; background: #dcf4e8; }
-.file-glyph--pdf { color: #ec433c; background: #ffe5e3; }
-.file-glyph--docx { color: #3474b8; background: #e2effc; }
-.file-glyph--image { color: #7457c4; background: #eee8ff; }
 .file-glyph--file { color: #5d6975; background: #edf0f2; }
 .file-glyph--small { width: 32px; height: 36px; }
 .row-action { border: 0; background: transparent; height: 32px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; }
