@@ -10,7 +10,7 @@ Koofr-GUI 使用 GitHub Actions 在推送版本标签时构建并发布 Windows 
 
 1. 将 `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json` 的版本统一改为相同的 SemVer 版本，例如 `1.0.1`。
 2. 在 `CHANGELOG.md` 增加该版本的发布日期、变更与已知限制。
-3. 在 Windows 环境执行 `npm ci` 与 `npm run check`。
+3. 在 Windows 环境执行 `npm ci` 与 `npm run verify:full`。
 4. 提交版本变更，然后创建并推送完全匹配的标签：
 
    ```powershell

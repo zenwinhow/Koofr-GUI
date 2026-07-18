@@ -10,6 +10,8 @@ pub enum AppError {
     AuthenticationFailed,
     #[error("authentication is required")]
     NotAuthenticated,
+    #[error("the authenticated account identity is unavailable")]
+    AccountIdentityUnavailable,
     #[error("invalid input: {0}")]
     InvalidInput(&'static str),
     #[error("the requested item already exists")]
@@ -20,6 +22,8 @@ pub enum AppError {
     Forbidden,
     #[error("the transfer was cancelled")]
     Cancelled,
+    #[error("the interrupted transfer can be resumed or retried")]
+    TransferPaused,
     #[error("the remote transfer ended before all bytes were received")]
     IncompleteTransfer,
     #[error("the transfer identifier is already active")]
@@ -85,6 +89,10 @@ impl From<AppError> for CommandError {
                 "邮箱或应用专用密码不正确，请检查后重试。",
             ),
             AppError::NotAuthenticated => Self::new("not_authenticated", "请先连接 Koofr 账户。"),
+            AppError::AccountIdentityUnavailable => Self::new(
+                "account_identity_unavailable",
+                "无法确认当前 Koofr 账户，请重新登录后重试。",
+            ),
             AppError::InvalidInput(_) => {
                 Self::new("invalid_input", "请求中包含无效的路径、名称或标识。")
             }
@@ -94,6 +102,9 @@ impl From<AppError> for CommandError {
             AppError::NotFound => Self::new("not_found", "指定的文件、文件夹或挂载点不存在。"),
             AppError::Forbidden => Self::new("forbidden", "当前账户没有执行此操作的权限。"),
             AppError::Cancelled => Self::new("cancelled", "传输已取消。"),
+            AppError::TransferPaused => {
+                Self::new("transfer_paused", "传输已暂停，可从传输面板继续。")
+            }
             AppError::IncompleteTransfer => {
                 Self::new("incomplete_transfer", "传输未完整结束，请重试。")
             }

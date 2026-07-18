@@ -195,7 +195,12 @@ impl LocalDownloadPath {
         &self.0
     }
 
-    pub fn temporary_path(&self) -> Result<PathBuf, AppError> {
+    pub fn resumable_temporary_path(&self, transfer_id: &str) -> Result<PathBuf, AppError> {
+        let transfer_id = uuid::Uuid::parse_str(transfer_id)
+            .map_err(|_| AppError::InvalidInput("transfer id"))?;
+        if transfer_id.is_nil() {
+            return Err(AppError::InvalidInput("transfer id"));
+        }
         let file_name = self
             .0
             .file_name()
@@ -203,7 +208,7 @@ impl LocalDownloadPath {
             .ok_or(AppError::InvalidInput("local download file name"))?;
         Ok(self
             .0
-            .with_file_name(format!(".{file_name}.koofr-part-{}", uuid::Uuid::new_v4())))
+            .with_file_name(format!(".{file_name}.koofr-part-{transfer_id}")))
     }
 }
 

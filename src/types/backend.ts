@@ -2,11 +2,13 @@ export interface CommandError {
   code:
     | 'authentication_failed'
     | 'not_authenticated'
+    | 'account_identity_unavailable'
     | 'invalid_input'
     | 'conflict'
     | 'not_found'
     | 'forbidden'
     | 'cancelled'
+    | 'transfer_paused'
     | 'incomplete_transfer'
     | 'remote_error'
     | 'network_error'
@@ -104,7 +106,8 @@ export interface TrashRestoreTarget {
 }
 
 export type TransferDirection = 'upload' | 'download'
-export type TransferState = 'running' | 'completed' | 'cancelled' | 'failed'
+export type TransferState = 'running' | 'paused' | 'completed' | 'cancelled' | 'failed'
+export type RecoveryKind = 'byte_resume' | 'chunk_resume' | 'restart'
 
 export interface TransferProgress {
   transferId: string
@@ -118,6 +121,15 @@ export interface TransferResult {
   transferId: string
   bytesTransferred: number
   file: RemoteFile | null
+}
+
+export interface ResumableTransfer {
+  readonly transferId: string
+  readonly name: string
+  readonly direction: TransferDirection
+  readonly recoveryKind: RecoveryKind
+  readonly bytesTransferred: number
+  readonly totalBytes: number
 }
 
 export interface LocalFileSelection {

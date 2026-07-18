@@ -11,7 +11,8 @@
     "dev": "vite",
     "dev:desktop": "tauri dev",
     "build": "tsc -b && vite build",
-    "build:desktop": "tauri build",
+    "build:desktop": "tauri build --no-bundle",
+    "build:installer": "tauri build --bundles nsis",
     "lint": "eslint .",
     "test": "vitest run",
     "clean:frontend": "node scripts/clean.mjs frontend",
@@ -19,6 +20,8 @@
     "clean": "node scripts/clean.mjs build",
     "clean:all": "node scripts/clean.mjs all",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml",
+    "verify:quick": "npm run lint && npm run test -- --run src/features/transfers/SplitUploadDialog.test.tsx && npm run build",
+    "verify:full": "npm run check",
     "check": "npm run lint && npm run test && npm run build && npm run check:rust",
     "tauri": "tauri"
   },

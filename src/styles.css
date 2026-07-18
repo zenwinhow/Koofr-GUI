@@ -728,6 +728,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .new-menu button { width: 100%; border: 0; background: transparent; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .new-menu button:hover { background: #f2f3f5; }
+.upload-mode-menu { width: 250px; }
 .workspace__heading { margin: 24px 0 20px; }
 .workspace__heading h1 { font-size: 28px; line-height: 1.15; letter-spacing: -.5px; margin: 0 0 7px; }
 .workspace__heading p { margin: 0; color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 7px; }
@@ -982,6 +983,15 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .modal-field input { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #ccd1d6; border-radius: 7px; outline: 0; color: var(--text); }
 .modal-field input:focus { border-color: color-mix(in srgb, var(--accent) 68%, #aab0b7); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
 .modal-field--spaced { margin-top: 18px; }
+.split-upload-dialog .modal-field small { display: flex; align-items: center; gap: var(--space-1); color: var(--muted); font-size: 11px; font-weight: 450; line-height: 1.45; }
+.split-upload-dialog .modal-field small svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.split-upload-dialog { display: grid; gap: var(--space-4); }
+.split-upload-dialog > p { color: var(--muted); line-height: 1.6; }
+.split-upload-dialog__summary { padding: var(--space-3); border-radius: 9px; background: var(--surface-subtle); display: flex; align-items: center; gap: var(--space-3); }
+.split-upload-dialog__summary > span:first-child { width: 40px; height: 40px; border-radius: 9px; display: grid; place-items: center; color: var(--accent-dark); background: var(--accent-soft-strong); flex: 0 0 auto; }
+.split-upload-dialog__summary > span:last-child { min-width: 0; display: grid; gap: var(--space-1); }
+.split-upload-dialog__summary small { color: var(--muted); font-size: 11.5px; }
+.split-upload-dialog__summary strong { color: var(--text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @keyframes modal-backdrop-in {
   from { opacity: 0; }

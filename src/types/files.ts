@@ -1,4 +1,4 @@
-import type { TransferDirection, TransferState } from './backend'
+import type { RecoveryKind, TransferDirection, TransferState } from './backend'
 
 export type FileKind =
   | 'folder'
@@ -10,12 +10,20 @@ export type FileKind =
   | 'executable'
   | 'file'
 
+export type UploadMode = 'compatible' | 'split'
+
+export interface SplitUploadSettings {
+  readonly packageName: string
+  readonly partBytes: number
+}
+
 export interface TransferItem {
-  id: string
-  name: string
-  direction: TransferDirection
-  state: TransferState
-  bytesTransferred: number
-  totalBytes: number | null
-  localKind: 'file' | 'folder'
+  readonly id: string
+  readonly name: string
+  readonly direction: TransferDirection
+  readonly state: TransferState
+  readonly bytesTransferred: number
+  readonly totalBytes: number | null
+  readonly localKind: 'file' | 'folder'
+  readonly recoveryKind: RecoveryKind | null
 }

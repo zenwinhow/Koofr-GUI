@@ -9,12 +9,14 @@ import type {
   LocalFileSelection,
   LoginBootstrap,
   RemoteFile,
+  ResumableTransfer,
   TransferProgress,
   TransferResult,
   TrashItem,
   TrashList,
   CommandError,
 } from '../types/backend'
+import type { SplitUploadSettings } from '../types/files'
 
 const TRANSFER_EVENT = 'koofr://transfer-progress'
 
@@ -208,6 +210,28 @@ export const koofr = {
     }
   },
 
+  uploadSplitFile(
+    mountId: string,
+    remoteDirectory: string,
+    localPathGrant: string,
+    settings: SplitUploadSettings,
+  ) {
+    const transferId = crypto.randomUUID()
+    return {
+      transferId,
+      result: invoke<TransferResult>('upload_split_file', {
+        request: {
+          transferId,
+          mountId,
+          remoteDirectory,
+          localPathGrant,
+          packageName: settings.packageName,
+          partBytes: settings.partBytes,
+        },
+      }),
+    }
+  },
+
   downloadFile(mountId: string, remotePath: string, localPathGrant: string) {
     const transferId = crypto.randomUUID()
     return {
@@ -236,6 +260,18 @@ export const koofr = {
 
   cancelTransfer(transferId: string) {
     return invoke<boolean>('cancel_transfer', { transferId })
+  },
+
+  listResumableTransfers() {
+    return invoke<ResumableTransfer[]>('list_resumable_transfers')
+  },
+
+  resumeTransfer(transferId: string) {
+    return invoke<TransferResult>('resume_transfer', { transferId })
+  },
+
+  discardResumableTransfer(transferId: string) {
+    return invoke<boolean>('discard_resumable_transfer', { transferId })
   },
 
   openDownloadedFile(transferId: string) {
