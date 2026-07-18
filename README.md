@@ -71,7 +71,10 @@ npm run clean:all
 | `npm run dev` | 启动 Vite 前端开发服务器 |
 | `npm run dev:desktop` | 启动完整 Tauri 桌面开发环境 |
 | `npm run build` | 类型检查并生成 `dist/` 前端资源 |
-| `npm run build:desktop` | 构建 Windows 发布版可执行文件 |
+| `npm run build:desktop` | 构建 Windows 发布版可执行文件（不生成安装包） |
+| `npm run build:installer` | 显式构建 NSIS 安装包（发布流程使用） |
+| `npm run verify:quick` | 快速验证 lint、拆分上传测试和前端构建 |
+| `npm run verify:full` | 完整验证，等同于 `npm run check` |
 | `npm run check` | 运行全部前端和 Rust 检查 |
 | `npm run clean` | 清理构建产物并保留依赖 |
 | `npm run clean:all` | 清理构建产物和 `node_modules/` |
