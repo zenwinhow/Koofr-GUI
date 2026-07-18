@@ -1,6 +1,6 @@
 [package]
 name = "koofr-gui"
-version = "1.0.0"
+version = "1.2.0"
 description = "Windows-first desktop client for Koofr"
 authors = ["Koofr-GUI contributors"]
 edition = "2024"

@@ -1,15 +1,21 @@
 import {
   Clock3,
+  Cloud,
   Folder,
   HelpCircle,
   LockKeyhole,
   LogOut,
   Palette,
   Settings,
+  Share,
   Share2,
   Trash2,
 } from 'lucide-react'
+import { useState } from 'react'
 import { formatStorageMegabytes } from '../features/files/filePresentation'
+import { ShareLinksDialog } from '../features/links/ShareLinksDialog'
+import { ConnectedPlacesDialog } from '../features/places/ConnectedPlacesDialog'
+import type { KoofrMount } from '../types/backend'
 
 const primaryItems = [
   { label: '我的文件', icon: Folder },
@@ -28,6 +34,7 @@ interface AppSidebarProps {
   storageName: string
   storageUsed: number | null
   storageTotal: number | null
+  mounts: readonly KoofrMount[]
 }
 
 export function AppSidebar({
@@ -40,7 +47,9 @@ export function AppSidebar({
   storageName,
   storageUsed,
   storageTotal,
+  mounts,
 }: AppSidebarProps) {
+  const [accountDialog, setAccountDialog] = useState<'links' | 'places' | null>(null)
   const storagePercent = storageUsed !== null && storageTotal !== null && storageTotal > 0
     ? Math.min(100, Math.max(0, (storageUsed / storageTotal) * 100))
     : 0
@@ -68,6 +77,18 @@ export function AppSidebar({
           <LockKeyhole size={19} strokeWidth={1.9} />
           <span>私人保险箱</span>
           <span className="vault-state">已锁定</span>
+        </button>
+      </div>
+
+      <div className="sidebar__section sidebar__section--account">
+        <p className="sidebar__section-label">账户功能</p>
+        <button className="nav-item" type="button" onClick={() => setAccountDialog('links')}>
+          <Share size={19} strokeWidth={1.9} />
+          <span>分享链接</span>
+        </button>
+        <button className="nav-item" type="button" onClick={() => setAccountDialog('places')}>
+          <Cloud size={19} strokeWidth={1.9} />
+          <span>已连接存储</span>
         </button>
       </div>
 
@@ -100,6 +121,13 @@ export function AppSidebar({
           帮助与反馈
         </button>
       </div>
+
+      {accountDialog === 'links' ? (
+        <ShareLinksDialog mounts={mounts} onClose={() => setAccountDialog(null)} />
+      ) : null}
+      {accountDialog === 'places' ? (
+        <ConnectedPlacesDialog mounts={mounts} onClose={() => setAccountDialog(null)} />
+      ) : null}
     </aside>
   )
 }

@@ -7,6 +7,7 @@ import { TitleBar } from './components/TitleBar'
 import { LoginPage } from './features/auth/LoginPage'
 import { CollectionWorkspace } from './features/files/CollectionWorkspace'
 import { FileWorkspace } from './features/files/FileWorkspace'
+import { CreateShareLinkDialog } from './features/links/CreateShareLinkDialog'
 import { isDirectory } from './features/files/filePresentation'
 import { isCollectionView, useKoofrCollections } from './features/files/useKoofrCollections'
 import { useKoofrWorkspace } from './features/files/useKoofrWorkspace'
@@ -31,7 +32,7 @@ import type {
 } from './types/backend'
 import type { TransferItem } from './types/files'
 
-type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
+type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'share' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
 type AuthState = 'checking' | 'signedOut' | 'signingIn' | 'signedIn'
 
 interface PendingDownload {
@@ -547,6 +548,11 @@ function App() {
     setModalKind('rename')
   }
 
+  const openShare = (file: RemoteFile) => {
+    setPendingFiles([file])
+    setModalKind('share')
+  }
+
   const renameFile = async () => {
     const file = pendingFiles[0]
     const name = modalInput.trim()
@@ -690,6 +696,7 @@ function App() {
             storageName={activeMount?.name ?? ''}
             storageUsed={activeMount?.spaceUsed ?? null}
             storageTotal={activeMount?.spaceTotal ?? null}
+            mounts={workspace.mounts}
           />
           {isCollectionView(activeItem) ? (
             <CollectionWorkspace
@@ -726,6 +733,7 @@ function App() {
               onThemeOpen={() => setModalKind('theme')}
               onUpload={() => void handleUpload()}
               onDownload={(file) => void handleDownload(file)}
+              onShare={openShare}
               onRename={openRename}
               onDelete={openDelete}
             />
@@ -798,6 +806,14 @@ function App() {
             <input autoFocus value={modalInput} maxLength={255} onChange={(event) => setModalInput(event.target.value)} />
           </label>
         </Modal>
+      ) : null}
+
+      {authState === 'signedIn' && modalKind === 'share' && pendingFiles[0] && workspace.activeMountId ? (
+        <CreateShareLinkDialog
+          mountId={workspace.activeMountId}
+          file={pendingFiles[0]}
+          onClose={() => setModalKind(null)}
+        />
       ) : null}
 
       {authState === 'signedIn' && modalKind === 'rename' ? (

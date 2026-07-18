@@ -55,6 +55,19 @@ export interface KoofrMount {
   isShared: boolean
 }
 
+export type PublicLinkKind = 'download' | 'upload'
+
+export interface PublicLink {
+  readonly id: string
+  readonly name: string
+  readonly path: string
+  readonly counter: number
+  readonly url: string
+  readonly shortUrl: string
+  readonly hasPassword: boolean
+  readonly kind: PublicLinkKind
+}
+
 export interface RemoteFile {
   name: string
   entryType: string

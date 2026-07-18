@@ -11,6 +11,7 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  Share2,
   Trash2,
   UploadCloud,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ interface FileWorkspaceProps {
   onThemeOpen: () => void
   onUpload: () => void
   onDownload: (file: RemoteFile) => void
+  onShare: (file: RemoteFile) => void
   onRename: (file: RemoteFile) => void
   onDelete: (files: RemoteFile[]) => void
 }
@@ -72,6 +74,7 @@ export function FileWorkspace({
   onThemeOpen,
   onUpload,
   onDownload,
+  onShare,
   onRename,
   onDelete,
 }: FileWorkspaceProps) {
@@ -226,6 +229,9 @@ export function FileWorkspace({
           <strong>{selectedFiles.length}</strong><span>已选中</span><i />
           <button type="button" disabled={!downloadableSelection} onClick={() => downloadableSelection && onDownload(downloadableSelection)}>
             <ArrowDownToLine size={18} />下载
+          </button>
+          <button type="button" disabled={!singleSelection} onClick={() => singleSelection && onShare(singleSelection)}>
+            <Share2 size={17} />分享
           </button>
           <button type="button" disabled={!singleSelection} onClick={() => singleSelection && onRename(singleSelection)}>
             <Pencil size={17} />重命名
