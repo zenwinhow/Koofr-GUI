@@ -127,7 +127,12 @@ pub async fn download_folder(
     let result = executor
         .run(request.remote_path, &request.transfer_id)
         .await;
+    let paused = context.manager.was_paused(&request.transfer_id);
     context.manager.finish(&request.transfer_id);
+    let result = match result {
+        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
+        other => other,
+    };
     emit_terminal(
         &context.app,
         &request.transfer_id,

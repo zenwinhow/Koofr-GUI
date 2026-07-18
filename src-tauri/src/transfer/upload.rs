@@ -113,12 +113,15 @@ async fn run_upload(
         progress.clone(),
     )
     .await;
+    let paused = manager.was_paused(&transfer_id);
     manager.finish(&transfer_id);
     let result = match result {
         Ok(result) => {
             checkpoints.remove(&transfer_id).await?;
             Ok(result)
         }
+        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
+        Err(AppError::Cancelled) => Err(AppError::Cancelled),
         Err(_) => Err(AppError::TransferPaused),
     };
     emit_terminal(

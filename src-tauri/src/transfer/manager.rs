@@ -1,6 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::{Mutex, MutexGuard},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex, MutexGuard,
+    },
 };
 
 use tokio_util::sync::CancellationToken;
@@ -9,7 +12,12 @@ use crate::error::AppError;
 
 #[derive(Default)]
 pub struct TransferManager {
-    active: Mutex<HashMap<String, CancellationToken>>,
+    active: Mutex<HashMap<String, TransferControl>>,
+}
+
+struct TransferControl {
+    token: CancellationToken,
+    pause_requested: Arc<AtomicBool>,
 }
 
 impl TransferManager {
@@ -20,7 +28,13 @@ impl TransferManager {
             return Err(AppError::DuplicateTransfer);
         }
         let token = CancellationToken::new();
-        active.insert(transfer_id.to_owned(), token.clone());
+        active.insert(
+            transfer_id.to_owned(),
+            TransferControl {
+                token: token.clone(),
+                pause_requested: Arc::new(AtomicBool::new(false)),
+            },
+        );
         Ok(token)
     }
 
@@ -30,22 +44,43 @@ impl TransferManager {
 
     pub fn cancel(&self, transfer_id: &str) -> Result<bool, AppError> {
         validate_transfer_id(transfer_id)?;
-        let token = self.active().get(transfer_id).cloned();
-        if let Some(token) = token {
-            token.cancel();
+        let active = self.active();
+        let control = active.get(transfer_id);
+        if let Some(control) = control {
+            control.pause_requested.store(false, Ordering::Release);
+            control.token.cancel();
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    pub fn cancel_all(&self) {
-        for token in self.active().values() {
-            token.cancel();
+    pub fn pause(&self, transfer_id: &str) -> Result<bool, AppError> {
+        validate_transfer_id(transfer_id)?;
+        let active = self.active();
+        let control = active.get(transfer_id);
+        if let Some(control) = control {
+            control.pause_requested.store(true, Ordering::Release);
+            control.token.cancel();
+            Ok(true)
+        } else {
+            Ok(false)
         }
     }
 
-    fn active(&self) -> MutexGuard<'_, HashMap<String, CancellationToken>> {
+    pub fn was_paused(&self, transfer_id: &str) -> bool {
+        self.active()
+            .get(transfer_id)
+            .is_some_and(|control| control.pause_requested.load(Ordering::Acquire))
+    }
+
+    pub fn cancel_all(&self) {
+        for control in self.active().values() {
+            control.token.cancel();
+        }
+    }
+
+    fn active(&self) -> MutexGuard<'_, HashMap<String, TransferControl>> {
         match self.active.lock() {
             Ok(active) => active,
             Err(poisoned) => poisoned.into_inner(),
@@ -74,6 +109,7 @@ mod tests {
         assert!(manager.register(&id).is_err());
         assert!(manager.cancel(&id).expect("cancel transfer"));
         assert!(token.is_cancelled());
+        assert!(!manager.was_paused(&id));
         manager.finish(&id);
         assert!(!manager.cancel(&id).expect("cancel missing transfer"));
 

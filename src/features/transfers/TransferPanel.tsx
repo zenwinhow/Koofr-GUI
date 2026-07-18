@@ -3,6 +3,7 @@ import {
   ArrowUpToLine,
   ExternalLink,
   FolderOpen,
+  Pause,
   Play,
   RotateCcw,
   Trash2,
@@ -17,6 +18,7 @@ interface TransferPanelProps {
   items: TransferItem[]
   onClose: () => void
   onCancel: (transferId: string) => void
+  onPause: (transferId: string) => void
   onResume: (transferId: string) => void
   onDiscard: (transferId: string) => void
   onOpenFile: (transferId: string) => void
@@ -43,6 +45,7 @@ export function TransferPanel({
   items,
   onClose,
   onCancel,
+  onPause,
   onResume,
   onDiscard,
   onOpenFile,
@@ -109,9 +112,14 @@ export function TransferPanel({
                 ) : null}
               </div>
               {item.state === 'running' ? (
+                <>
+                  <button className="row-action" type="button" aria-label={`暂停 ${item.name}`} title="暂停" onClick={() => onPause(item.id)}>
+                    <Pause size={16} />
+                  </button>
                 <button className="row-action" type="button" aria-label={`取消 ${item.name}`} onClick={() => onCancel(item.id)}>
                   <X size={16} />
                 </button>
+                </>
               ) : null}
             </div>
           )

@@ -95,6 +95,7 @@ pub fn run() {
             commands::open_downloaded_file,
             commands::open_downloaded_folder,
             commands::cancel_transfer,
+            commands::pause_transfer,
             transfer_commands::list_resumable_transfers,
             transfer_commands::resume_transfer,
             transfer_commands::discard_resumable_transfer,

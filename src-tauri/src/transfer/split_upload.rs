@@ -115,6 +115,7 @@ async fn run(
 ) -> Result<TransferResult, AppError> {
     let cancel = runtime.manager.register(&checkpoint.transfer_id)?;
     let result = run_inner(&runtime, &cancel, &mut checkpoint).await;
+    let paused = runtime.manager.was_paused(&checkpoint.transfer_id);
     runtime.manager.finish(&checkpoint.transfer_id);
     let committed = checkpoint
         .completed_chunks
@@ -129,6 +130,8 @@ async fn run(
         Err(AppError::InvalidInput(reason)) => Err(AppError::InvalidInput(reason)),
         Err(AppError::Conflict) => Err(AppError::Conflict),
         Err(AppError::Forbidden) => Err(AppError::Forbidden),
+        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
+        Err(AppError::Cancelled) => Err(AppError::Cancelled),
         Err(_) => Err(AppError::TransferPaused),
     };
     emit_terminal(

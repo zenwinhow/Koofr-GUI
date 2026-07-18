@@ -702,4 +702,12 @@ pub fn cancel_transfer(state: State<'_, AppState>, transfer_id: String) -> Comma
         .cancel(&transfer_id)
         .map_err(CommandError::from)
 }
+
+#[tauri::command]
+pub fn pause_transfer(state: State<'_, AppState>, transfer_id: String) -> CommandResult<bool> {
+    state
+        .transfers
+        .pause(&transfer_id)
+        .map_err(CommandError::from)
+}
 use std::path::PathBuf;

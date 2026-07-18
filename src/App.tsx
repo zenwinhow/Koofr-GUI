@@ -497,6 +497,14 @@ function App() {
     }
   }
 
+  const pauseTransfer = async (transferId: string) => {
+    try {
+      await koofr.pauseTransfer(transferId)
+    } catch (error) {
+      showNotice(commandErrorMessage(error, '无法暂停这个传输任务。'))
+    }
+  }
+
   const resumeTransfer = async (transferId: string) => {
     setTransfers((current) => current.map((item) => item.id === transferId
       ? { ...item, state: 'running' }
@@ -786,6 +794,7 @@ function App() {
             items={transfers}
             onClose={() => setTransferVisible(false)}
             onCancel={(transferId) => void cancelTransfer(transferId)}
+            onPause={(transferId) => void pauseTransfer(transferId)}
             onResume={(transferId) => void resumeTransfer(transferId)}
             onDiscard={(transferId) => void discardResumableTransfer(transferId)}
             onOpenFile={(transferId) => void openDownloadedFile(transferId)}

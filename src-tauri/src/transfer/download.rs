@@ -82,12 +82,15 @@ async fn run_download(
         Ok(()) => download_inner(&app, api, &cancel, &checkpoint, progress.clone()).await,
         Err(error) => Err(error),
     };
+    let paused = manager.was_paused(&transfer_id);
     manager.finish(&transfer_id);
     let result = match result {
         Ok(result) => {
             checkpoints.remove(&transfer_id).await?;
             Ok(result)
         }
+        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
+        Err(AppError::Cancelled) => Err(AppError::Cancelled),
         Err(_) => Err(AppError::TransferPaused),
     };
     emit_terminal(

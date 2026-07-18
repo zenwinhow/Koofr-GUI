@@ -23,6 +23,7 @@ describe('TransferPanel', () => {
         }]}
         onClose={vi.fn()}
         onCancel={vi.fn()}
+        onPause={vi.fn()}
         onResume={onResume}
         onDiscard={vi.fn()}
         onOpenFile={vi.fn()}
@@ -57,6 +58,7 @@ describe('TransferPanel', () => {
         }]}
         onClose={vi.fn()}
         onCancel={vi.fn()}
+        onPause={vi.fn()}
         onResume={onResume}
         onDiscard={vi.fn()}
         onOpenFile={vi.fn()}

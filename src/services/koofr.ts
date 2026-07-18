@@ -262,6 +262,10 @@ export const koofr = {
     return invoke<boolean>('cancel_transfer', { transferId })
   },
 
+  pauseTransfer(transferId: string) {
+    return invoke<boolean>('pause_transfer', { transferId })
+  },
+
   listResumableTransfers() {
     return invoke<ResumableTransfer[]>('list_resumable_transfers')
   },
