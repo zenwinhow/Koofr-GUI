@@ -156,7 +156,7 @@ export function FileWorkspace({
 
   return (
     <main className="workspace">
-      <div className="workspace__topbar">
+      <div className="workspace__topbar workspace__topbar--files">
         <nav className="breadcrumb" aria-label="当前文件夹路径">
           <select
             className="mount-select"

@@ -619,8 +619,26 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   overflow: auto;
   background: #fff;
 }
-.workspace__topbar { min-height: 42px; display: flex; align-items: center; gap: 16px; }
-.breadcrumb { display: flex; gap: 8px; align-items: center; font-size: 13px; white-space: nowrap; min-width: 0; max-width: 38%; }
+.workspace__topbar {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.workspace__topbar--files {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(190px, 340px) auto;
+}
+.breadcrumb {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  white-space: nowrap;
+}
 .breadcrumb > span, .breadcrumb__segment > span { color: #a2a6ad; }
 .breadcrumb__segment { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .breadcrumb button {
@@ -650,8 +668,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   text-overflow: ellipsis;
 }
 .search-box {
-  margin-left: auto;
-  width: min(340px, 32vw);
+  min-width: 0;
+  width: auto;
   height: 40px;
   border: 1px solid #d4d8dd;
   border-radius: 7px;
@@ -666,7 +684,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .search-box:focus-within { border-color: color-mix(in srgb, var(--accent) 68%, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent); }
 .search-box input { border: 0; outline: 0; min-width: 0; flex: 1; font-size: 13px; color: var(--text); }
 .search-box input::placeholder { color: #8a8f97; }
-.top-actions { display: flex; gap: 10px; align-items: center; }
+.top-actions { min-width: 0; display: flex; flex: 0 0 auto; gap: 10px; align-items: center; }
+.top-actions > .menu-anchor { flex: 0 0 auto; }
+.top-actions .primary-button,
+.top-actions .secondary-button { flex: 0 0 auto; white-space: nowrap; }
 .primary-button, .secondary-button {
   height: 40px;
   border-radius: 7px;
@@ -1291,6 +1312,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .nav-item { width: 100%; justify-content: center; padding: 0; }
   .nav-item--active::before { left: -10px; }
   .sidebar__section { width: 100%; padding-top: 16px; margin-top: 14px; }
+  .workspace__topbar--files { grid-template-columns: minmax(0, 1fr) auto; }
   .search-box { width: auto; flex: 1; margin-left: 0; }
   .breadcrumb { display: none; }
   .workspace__heading { margin: 22px 0 18px; }
@@ -1312,7 +1334,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .window-controls button { width: 42px; }
   .sidebar { display: none; }
   .workspace { padding: 14px 14px 24px; }
-  .workspace__topbar { align-items: stretch; gap: 9px; flex-wrap: wrap; }
+  .workspace__topbar { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
   .search-box { order: 2; flex-basis: 100%; max-width: none; width: 100%; }
   .top-actions { margin-left: auto; }
   .collection-workspace__topbar .top-actions {
