@@ -1,6 +1,10 @@
 mod models;
 
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+    time::Duration,
+};
 
 use reqwest::{Client, Method, Response, StatusCode, Url, header};
 use serde::Serialize;
@@ -36,6 +40,7 @@ pub struct KoofrApi {
     base_url: Url,
     client: Client,
     session: RwLock<Option<Session>>,
+    account_scope: RwLock<Option<String>>,
 }
 
 impl KoofrApi {
@@ -57,6 +62,7 @@ impl KoofrApi {
             base_url,
             client,
             session: RwLock::new(None),
+            account_scope: RwLock::new(None),
         })
     }
 
@@ -101,11 +107,13 @@ impl KoofrApi {
             token: token.token,
             user_id,
         });
+        *self.account_scope.write().await = Some(account_scope(email, info.user_id.as_deref()));
         Ok(info)
     }
 
     pub async fn disconnect(&self) {
         *self.session.write().await = None;
+        *self.account_scope.write().await = None;
     }
 
     pub async fn session_info(&self) -> SessionInfo {
@@ -114,6 +122,14 @@ impl KoofrApi {
             authenticated: session.is_some(),
             user_id: session.as_ref().and_then(|session| session.user_id.clone()),
         }
+    }
+
+    pub async fn recovery_scope(&self) -> Result<String, AppError> {
+        self.account_scope
+            .read()
+            .await
+            .clone()
+            .ok_or(AppError::AccountIdentityUnavailable)
     }
 
     pub async fn list_mounts(&self) -> Result<Vec<Mount>, AppError> {
@@ -149,6 +165,24 @@ impl KoofrApi {
                 .to_owned();
         }
         Ok(payload.files)
+    }
+
+    pub async fn file_info(
+        &self,
+        mount_id: &MountId,
+        path: &RemotePath,
+    ) -> Result<FileInfo, AppError> {
+        let mut url = self.mount_endpoint(mount_id, &["files", "info"])?;
+        url.query_pairs_mut().append_pair("path", path.as_str());
+        let response = self
+            .authenticated_request(Method::GET, url)
+            .await?
+            .send()
+            .await?;
+        let response = Self::expect_status(response, &[StatusCode::OK])?;
+        let mut file = Self::decode_json::<FileInfo>(response).await?;
+        file.path = path.as_str().to_owned();
+        Ok(file)
     }
 
     pub async fn list_recent(&self) -> Result<Vec<LocatedFile>, AppError> {
@@ -472,14 +506,23 @@ impl KoofrApi {
         mount_id: &MountId,
         path: &RemotePath,
     ) -> Result<Response, AppError> {
+        self.download_response_from(mount_id, path, 0).await
+    }
+
+    pub async fn download_response_from(
+        &self,
+        mount_id: &MountId,
+        path: &RemotePath,
+        offset: u64,
+    ) -> Result<Response, AppError> {
         let mut url = self.content_mount_endpoint(mount_id, &["files", "get"])?;
         url.query_pairs_mut().append_pair("path", path.as_str());
-        let response = self
-            .authenticated_request(Method::GET, url)
-            .await?
-            .send()
-            .await?;
-        Self::expect_status(response, &[StatusCode::OK])
+        let mut request = self.authenticated_request(Method::GET, url).await?;
+        if offset > 0 {
+            request = request.header(header::RANGE, format!("bytes={offset}-"));
+        }
+        let response = request.send().await?;
+        Self::expect_status(response, &[StatusCode::OK, StatusCode::PARTIAL_CONTENT])
     }
 
     async fn authenticated_request(
@@ -536,12 +579,21 @@ impl KoofrApi {
     }
 }
 
+fn account_scope(email: &str, user_id: Option<&str>) -> String {
+    if let Some(user_id) = user_id.filter(|value| !value.is_empty()) {
+        return format!("user:{user_id}");
+    }
+    let mut hasher = DefaultHasher::new();
+    email.trim().to_lowercase().hash(&mut hasher);
+    format!("email:{:016x}", hasher.finish())
+}
+
 #[cfg(test)]
 mod tests {
     use httpmock::{Method::DELETE, Method::GET, Method::POST, Method::PUT, MockServer};
     use serde_json::json;
 
-    use super::{KoofrApi, Session};
+    use super::{KoofrApi, Session, account_scope};
     use crate::{
         error::AppError,
         file_ops::{MountId, RemotePath},
@@ -578,6 +630,19 @@ mod tests {
                 .map(|session| session.token.as_str()),
             Some("session-token")
         );
+        assert_eq!(
+            api.recovery_scope().await.expect("account recovery scope"),
+            "user:user-1"
+        );
+    }
+
+    #[test]
+    fn fallback_account_scope_is_stable_without_storing_the_plain_email() {
+        let first = account_scope(" Person@Example.com ", None);
+        let second = account_scope("person@example.com", None);
+
+        assert_eq!(first, second);
+        assert!(!first.contains("person@example.com"));
     }
 
     #[tokio::test]
@@ -900,5 +965,39 @@ mod tests {
         .expect("move entry");
 
         mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn requests_a_download_from_the_confirmed_byte_offset() {
+        let server = MockServer::start_async().await;
+        let mock = server
+            .mock_async(|when, then| {
+                when.method(GET)
+                    .path("/content/api/v2/mounts/mount_1/files/get")
+                    .query_param("path", "/large.bin")
+                    .header("authorization", "Token token=test-token")
+                    .header("range", "bytes=1048576-");
+                then.status(206)
+                    .header("content-range", "bytes 1048576-2097151/2097152")
+                    .body(vec![0_u8; 16]);
+            })
+            .await;
+        let api = KoofrApi::new(&server.base_url()).expect("create API client");
+        *api.session.write().await = Some(Session {
+            token: "test-token".to_owned(),
+            user_id: None,
+        });
+
+        let response = api
+            .download_response_from(
+                &MountId::parse("mount_1".to_owned()).expect("mount id"),
+                &RemotePath::parse("/large.bin".to_owned()).expect("remote path"),
+                1_048_576,
+            )
+            .await
+            .expect("request range");
+
+        mock.assert_async().await;
+        assert_eq!(response.status(), reqwest::StatusCode::PARTIAL_CONTENT);
     }
 }

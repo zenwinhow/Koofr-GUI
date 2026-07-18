@@ -129,6 +129,35 @@ function App() {
     }
   }, [authState])
 
+  useEffect(() => {
+    if (authState !== 'signedIn') return
+    let active = true
+    void koofr.listResumableTransfers()
+      .then((resumable) => {
+        if (!active) return
+        setTransfers((current) => {
+          const existingIds = new Set(current.map((item) => item.id))
+          const restored = resumable
+            .filter((item) => !existingIds.has(item.transferId))
+            .map((item): TransferItem => ({
+              id: item.transferId,
+              name: item.name,
+              direction: item.direction,
+              state: 'paused',
+              bytesTransferred: item.bytesTransferred,
+              totalBytes: item.totalBytes,
+              localKind: 'file',
+              recoveryKind: item.recoveryKind,
+            }))
+          return [...restored, ...current]
+        })
+      })
+      .catch((error) => {
+        if (active) setNotice(commandErrorMessage(error, '无法读取中断的传输任务。'))
+      })
+    return () => { active = false }
+  }, [authState])
+
   const showNotice = (message: string) => {
     setNotice(message)
     window.setTimeout(() => setNotice(''), 3200)
@@ -280,6 +309,7 @@ function App() {
         bytesTransferred: 0,
         totalBytes: null,
         localKind: 'file',
+        recoveryKind: 'restart',
       }, ...current])
       setTransferVisible(true)
 
@@ -301,7 +331,12 @@ function App() {
         }
       } catch (error) {
         setTransfers((current) => current.map((item) => item.id === transfer.transferId
-          ? { ...item, state: isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed' }
+          ? {
+              ...item,
+              state: isCommandErrorCode(error, 'transfer_paused')
+                ? 'paused'
+                : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
+            }
           : item))
         showNotice(commandErrorMessage(error, '上传失败，请稍后重试。'))
       }
@@ -324,6 +359,7 @@ function App() {
       bytesTransferred: 0,
       totalBytes: transfer.localKind === 'file' && file.size > 0 ? file.size : null,
       localKind: transfer.localKind,
+      recoveryKind: transfer.localKind === 'file' ? 'byte_resume' : null,
     }, ...current])
     setTransferVisible(true)
 
@@ -340,7 +376,12 @@ function App() {
           : item))
       } catch (error) {
         setTransfers((current) => current.map((item) => item.id === transfer.transferId
-          ? { ...item, state: isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed' }
+          ? {
+              ...item,
+              state: isCommandErrorCode(error, 'transfer_paused')
+                ? 'paused'
+                : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
+            }
           : item))
         showNotice(commandErrorMessage(error, '下载失败，请稍后重试。'))
       }
@@ -418,6 +459,48 @@ function App() {
     } catch (error) {
       showNotice(commandErrorMessage(error, '无法取消这个传输任务。'))
     }
+  }
+
+  const resumeTransfer = async (transferId: string) => {
+    setTransfers((current) => current.map((item) => item.id === transferId
+      ? { ...item, state: 'running' }
+      : item))
+    setTransferVisible(true)
+    try {
+      const result = await koofr.resumeTransfer(transferId)
+      setTransfers((current) => current.map((item) => item.id === transferId
+        ? {
+            ...item,
+            state: 'completed',
+            bytesTransferred: result.bytesTransferred,
+            totalBytes: item.totalBytes ?? result.bytesTransferred,
+          }
+        : item))
+      await workspace.refresh()
+    } catch (error) {
+      setTransfers((current) => current.map((item) => item.id === transferId
+        ? {
+            ...item,
+            state: isCommandErrorCode(error, 'transfer_paused') ? 'paused' : 'failed',
+          }
+        : item))
+      showNotice(commandErrorMessage(error, '无法继续这个传输任务。'))
+    }
+  }
+
+  const discardResumableTransfer = async (transferId: string) => {
+    try {
+      await koofr.discardResumableTransfer(transferId)
+      setTransfers((current) => current.filter((item) => item.id !== transferId))
+    } catch (error) {
+      showNotice(commandErrorMessage(error, '无法放弃这个中断任务。'))
+    }
+  }
+
+  const clearFinishedTransfers = () => {
+    setTransfers((current) => current.filter((item) => (
+      item.state === 'running' || item.state === 'paused'
+    )))
   }
 
   const openDownloadedFile = async (transferId: string) => {
@@ -660,9 +743,11 @@ function App() {
             items={transfers}
             onClose={() => setTransferVisible(false)}
             onCancel={(transferId) => void cancelTransfer(transferId)}
+            onResume={(transferId) => void resumeTransfer(transferId)}
+            onDiscard={(transferId) => void discardResumableTransfer(transferId)}
             onOpenFile={(transferId) => void openDownloadedFile(transferId)}
             onOpenFolder={(transferId) => void openDownloadedFolder(transferId)}
-            onClearFinished={() => setTransfers((current) => current.filter((item) => item.state === 'running'))}
+            onClearFinished={clearFinishedTransfers}
           />
           {!transferVisible ? (
             <button

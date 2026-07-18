@@ -9,6 +9,7 @@ import type {
   LocalFileSelection,
   LoginBootstrap,
   RemoteFile,
+  ResumableTransfer,
   TransferProgress,
   TransferResult,
   TrashItem,
@@ -236,6 +237,18 @@ export const koofr = {
 
   cancelTransfer(transferId: string) {
     return invoke<boolean>('cancel_transfer', { transferId })
+  },
+
+  listResumableTransfers() {
+    return invoke<ResumableTransfer[]>('list_resumable_transfers')
+  },
+
+  resumeTransfer(transferId: string) {
+    return invoke<TransferResult>('resume_transfer', { transferId })
+  },
+
+  discardResumableTransfer(transferId: string) {
+    return invoke<boolean>('discard_resumable_transfer', { transferId })
   },
 
   openDownloadedFile(transferId: string) {

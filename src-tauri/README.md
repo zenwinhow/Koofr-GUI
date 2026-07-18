@@ -4,7 +4,7 @@
 
 - `src/file_ops/`：挂载点 ID、远程路径、远程名称和本地选择路径的校验。
 - `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除及内容请求。
-- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、递归目录清单、进度事件、取消和下载临时内容清理。
+- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、单文件 Range 续传、持久化恢复检查点、递归目录清单、进度事件和取消。
 - `src/commands.rs`：暴露给 WebView 的窄范围 Tauri 命令。
 - `src/crypto/`、`src/vault_core/`：仍为空，Vault 尚未实现。
 - `src/credential_manager.rs`：把用户明确选择保存的应用专用密码写入 Windows 凭据管理器；密码不会进入普通配置。
@@ -22,9 +22,11 @@
   原生文件夹选择器获取；Rust 会验证它是现有的绝对目录且不是符号链接，只在其下使用
   清理后的远端名称创建新目标，并签发一次性、区分文件/文件夹的授权 ID。前端不能指定
   最终文件名或覆盖现有内容。上传同样拒绝符号链接。
-- 下载不覆盖现有文件；单文件先写入唯一 `.koofr-part-*` 文件。文件夹下载先递归建立
-  清单，再写入同级唯一 `.koofr-part-*` 目录；全部成功后才原子改名，失败或取消时清理
-  整个暂存树。Windows 非法名称会安全替换，同级清理后重名会稳定追加序号。
+- 下载不覆盖现有文件；单文件先写入由传输 ID 确定的 `.koofr-part-*` 文件，并把不含
+  凭据的恢复元数据保存到当前 Windows 用户的应用数据目录，并绑定 Koofr 用户 ID（兼容服务缺失该字段时使用邮箱指纹）隔离账户。网络中断、退出或暂停后，
+  Rust 会重新核对远端大小、修改时间和可用哈希，再发送 `Range` 请求从已落盘偏移继续；
+  服务端忽略 Range 时会安全截断分片并从头下载。文件夹下载仍使用临时目录并在失败或
+  取消时清理整个暂存树。Windows 非法名称会安全替换，同级清理后重名会稳定追加序号。
 - 发给前端的错误只包含稳定错误码与安全消息，不包含令牌、本地路径、远程路径或
   服务端响应正文。
 
@@ -40,10 +42,15 @@
 `prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
 `empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
-`delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`。
+`delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`、
+`list_resumable_transfers`、`resume_transfer`、`discard_resumable_transfer`。
 
-传输通过 `koofr://transfer-progress` 事件报告运行、完成、取消或失败状态；事件不包含
+传输通过 `koofr://transfer-progress` 事件报告运行、暂停、完成、取消或失败状态；事件不包含
 本地或远程文件名。对应 TypeScript 封装位于 `src/services/koofr.ts`。
+
+Koofr 官方 Go 客户端公开了 `FilesGetRange`，因此下载可以进行真实的字节级续传。公开
+上传协议及 rclone 的 Koofr 后端只有整文件 `FilesPut`，没有分块上传会话或已确认偏移；
+应用会持久化中断上传并提供“重新上传”，但不会把整文件重传标记为字节续传。
 
 ## 检查
 
