@@ -10,7 +10,9 @@ mod local_access;
 mod local_open;
 mod metadata_cache;
 mod settings;
+mod split_commands;
 mod transfer;
+mod transfer_commands;
 
 use credential_manager::CredentialManager;
 use koofr_api::KoofrApi;
@@ -18,12 +20,13 @@ use local_access::LocalAccessManager;
 use metadata_cache::MetadataCache;
 use settings::SettingsStore;
 use tauri::Manager;
-use transfer::TransferManager;
+use transfer::{TransferCheckpointStore, TransferManager};
 
 pub struct AppState {
     api: KoofrApi,
     local_access: LocalAccessManager,
     transfers: TransferManager,
+    transfer_checkpoints: TransferCheckpointStore,
     settings: SettingsStore,
     cache: MetadataCache,
     credentials: CredentialManager,
@@ -45,6 +48,9 @@ pub fn run() {
                 api: KoofrApi::production()?,
                 local_access: LocalAccessManager::default(),
                 transfers: TransferManager::default(),
+                transfer_checkpoints: TransferCheckpointStore::load(
+                    data_dir.join("transfer-checkpoints.json"),
+                ),
                 settings,
                 cache,
                 credentials: CredentialManager::initialize()?,
@@ -83,11 +89,15 @@ pub fn run() {
             commands::copy_entry,
             commands::delete_entry,
             commands::upload_file,
+            split_commands::upload_split_file,
             commands::download_file,
             folder_commands::download_folder,
             commands::open_downloaded_file,
             commands::open_downloaded_folder,
             commands::cancel_transfer,
+            transfer_commands::list_resumable_transfers,
+            transfer_commands::resume_transfer,
+            transfer_commands::discard_resumable_transfer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Koofr GUI");

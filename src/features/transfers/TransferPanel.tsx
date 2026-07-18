@@ -1,5 +1,15 @@
-import { ArrowDownToLine, ArrowUpToLine, ExternalLink, FolderOpen, Trash2, X } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  ExternalLink,
+  FolderOpen,
+  Play,
+  RotateCcw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { formatBytes } from '../files/filePresentation'
+import type { RecoveryKind } from '../../types/backend'
 import type { TransferItem } from '../../types/files'
 
 interface TransferPanelProps {
@@ -7,6 +17,8 @@ interface TransferPanelProps {
   items: TransferItem[]
   onClose: () => void
   onCancel: (transferId: string) => void
+  onResume: (transferId: string) => void
+  onDiscard: (transferId: string) => void
   onOpenFile: (transferId: string) => void
   onOpenFolder: (transferId: string) => void
   onClearFinished: () => void
@@ -14,22 +26,31 @@ interface TransferPanelProps {
 
 const stateLabels = {
   running: '正在传输',
+  paused: '已暂停',
   completed: '已完成',
   cancelled: '已取消',
   failed: '失败',
 } as const
+
+const recoveryActions = {
+  byte_resume: { label: '继续下载', Icon: Play },
+  chunk_resume: { label: '继续上传', Icon: Play },
+  restart: { label: '重新上传', Icon: RotateCcw },
+} satisfies Record<RecoveryKind, { readonly label: string; readonly Icon: typeof Play }>
 
 export function TransferPanel({
   visible,
   items,
   onClose,
   onCancel,
+  onResume,
+  onDiscard,
   onOpenFile,
   onOpenFolder,
   onClearFinished,
 }: TransferPanelProps) {
   const runningCount = items.filter((item) => item.state === 'running').length
-  const finishedCount = items.length - runningCount
+  const finishedCount = items.filter((item) => item.state !== 'running' && item.state !== 'paused').length
 
   return (
     <aside className={`transfer-panel${visible ? '' : ' transfer-panel--hidden'}`} aria-label="传输队列">
@@ -49,6 +70,7 @@ export function TransferPanel({
             ? Math.min(100, (item.bytesTransferred / item.totalBytes) * 100)
             : item.state === 'completed' ? 100 : 0
           const DirectionIcon = item.direction === 'upload' ? ArrowUpToLine : ArrowDownToLine
+          const recovery = item.recoveryKind ? recoveryActions[item.recoveryKind] : null
           return (
             <div className="transfer-item" key={item.id}>
               <span className="file-glyph file-glyph--file file-glyph--small"><DirectionIcon size={20} /></span>
@@ -59,6 +81,20 @@ export function TransferPanel({
                   <span className="transfer-item__percent">{Math.round(percent)}%</span>
                 </div>
                 <div className="progress-track"><span style={{ width: `${percent}%` }} /></div>
+                {item.state === 'paused' && recovery ? (
+                  <div className="transfer-item__actions">
+                    <button
+                      type="button"
+                      aria-label={`${recovery.label} ${item.name}`}
+                      onClick={() => onResume(item.id)}
+                    >
+                      <recovery.Icon size={14} />{recovery.label}
+                    </button>
+                    <button type="button" aria-label={`放弃恢复 ${item.name}`} onClick={() => onDiscard(item.id)}>
+                      <Trash2 size={14} />放弃
+                    </button>
+                  </div>
+                ) : null}
                 {item.direction === 'download' && item.state === 'completed' ? (
                   <div className="transfer-item__actions">
                     {item.localKind === 'file' ? (

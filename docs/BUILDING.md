@@ -76,17 +76,17 @@ npm run build
 建议先执行完整检查，再构建发布版本：
 
 ```powershell
-npm run check
+npm run verify:quick
 npm run build:desktop
 ```
 
-`npm run build:desktop` 会通过 Tauri 自动执行前端生产构建，然后编译 Rust 发布版本。成功后可执行文件位于：
+`npm run build:desktop` 会通过 Tauri 自动执行前端生产构建，然后编译 Rust 发布版本，并使用 `--no-bundle` 只生成可执行文件。成功后可执行文件位于：
 
 ```text
 src-tauri/target/release/koofr-gui.exe
 ```
 
-`src-tauri/tauri.conf.json` 启用了 NSIS 打包；构建会生成可执行文件和 `src-tauri/target/release/bundle/nsis/` 下的安装程序。GitHub Actions 使用同一构建流程创建公开 Release，但发布包不进行代码签名，因此 Windows 可能显示未知发布者或 SmartScreen 警告。具体步骤见 [发布流程](RELEASING.md)。
+`src-tauri/tauri.conf.json` 保留 NSIS 打包配置，但本地 `build:desktop` 不会生成安装程序。需要显式构建 NSIS 安装包时使用 `npm run build:installer`；正式发布由 GitHub Actions 负责。发布包不进行代码签名，因此 Windows 可能显示未知发布者或 SmartScreen 警告。具体步骤见 [发布流程](RELEASING.md)。
 
 ## 5. 质量检查
 

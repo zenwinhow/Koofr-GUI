@@ -109,7 +109,7 @@ All spacing derives from a 4px base.
 ### Modal
 
 - **Structure**: backdrop → semantic dialog section → close button, heading, content, primary action.
-- **Variants**: standard, wide, and download destination.
+- **Variants**: standard, wide, download destination, and split-upload setup.
 - **Spacing**: `--space-3` through `--space-6`.
 - **States**: opening, visible, busy/disabled action, validation error, closing.
 - **Accessibility**: labelled modal dialog, Escape dismissal, focus entry and restoration, backdrop click dismissal, clicks inside never dismiss.
@@ -138,7 +138,8 @@ All spacing derives from a 4px base.
 
 ### Transfer panel
 
-- **Structure**: header, status tabs, transfer list, per-item controls, footer.
+- **Structure**: upload-mode menu, header, status tabs, transfer list, per-item controls, footer.
+- **Upload modes**: ordinary upload remains a normal Koofr file; resumable large-file upload creates a user-named folder with a configurable part size, ordered raw binary parts, a bilingual command reference, built-in Windows/POSIX restore scripts, and an open checksum manifest. The menu must state this interoperability tradeoff before selection.
 - **States**: open, hidden, empty, running, completed, failed, cancelled.
 - **Accessibility**: live transfer values remain textual; action buttons have explicit labels.
 
