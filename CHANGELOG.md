@@ -4,9 +4,13 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
-## [1.2.0] - 2026-07-17
+## [1.3.0] - 2026-07-19
 
-### 鍙樻洿
+### 变更
+
+- 重构上传和下载文件后端
+- 支持下载断点续传
+- 支持上传时分卷拆分大文件并提供恢复方式
 
 - Add sharing-link management for querying, creating, copying, and confirming revocation of download and file-receiving links
 - Detect existing Koofr, Google Drive, OneDrive, Dropbox, and other connected storage mounts
