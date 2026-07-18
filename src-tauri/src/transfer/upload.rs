@@ -178,7 +178,7 @@ async fn upload_inner(
     })
 }
 
-fn modified_millis(metadata: &std::fs::Metadata) -> Result<u128, AppError> {
+pub(super) fn modified_millis(metadata: &std::fs::Metadata) -> Result<u128, AppError> {
     metadata
         .modified()?
         .duration_since(UNIX_EPOCH)

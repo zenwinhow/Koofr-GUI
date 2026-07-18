@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::error::AppError;
 
-use super::TransferDirection;
+use super::{TransferDirection, checkpoint_snapshot::snapshot, split_package::SplitPart};
 
 const CHECKPOINT_VERSION: u8 = 2;
 const MAX_CHECKPOINTS: usize = 128;
@@ -14,6 +14,7 @@ const MAX_CHECKPOINTS: usize = 128;
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryKind {
     ByteResume,
+    ChunkResume,
     Restart,
 }
 
@@ -44,9 +45,25 @@ pub struct UploadCheckpoint {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitUploadCheckpoint {
+    pub transfer_id: String,
+    pub owner_id: String,
+    pub mount_id: String,
+    pub remote_directory: String,
+    pub package_path: String,
+    pub local_path: PathBuf,
+    pub expected_size: u64,
+    pub modified_millis: u128,
+    pub chunk_size: u64,
+    pub completed_chunks: Vec<SplitPart>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "direction", content = "checkpoint", rename_all = "snake_case")]
 pub enum TransferCheckpoint {
     Download(DownloadCheckpoint),
+    SplitUpload(SplitUploadCheckpoint),
     Upload(UploadCheckpoint),
 }
 
@@ -54,6 +71,7 @@ impl TransferCheckpoint {
     fn transfer_id(&self) -> &str {
         match self {
             Self::Download(checkpoint) => &checkpoint.transfer_id,
+            Self::SplitUpload(checkpoint) => &checkpoint.transfer_id,
             Self::Upload(checkpoint) => &checkpoint.transfer_id,
         }
     }
@@ -61,6 +79,7 @@ impl TransferCheckpoint {
     pub fn owner_id(&self) -> &str {
         match self {
             Self::Download(checkpoint) => &checkpoint.owner_id,
+            Self::SplitUpload(checkpoint) => &checkpoint.owner_id,
             Self::Upload(checkpoint) => &checkpoint.owner_id,
         }
     }
@@ -193,45 +212,6 @@ impl TransferCheckpointStore {
             .await
             .map_err(|_| AppError::LocalData)
     }
-}
-
-async fn snapshot(checkpoint: TransferCheckpoint) -> Result<ResumableTransfer, AppError> {
-    match checkpoint {
-        TransferCheckpoint::Download(checkpoint) => {
-            let bytes_transferred =
-                match tokio::fs::symlink_metadata(&checkpoint.partial_path).await {
-                    Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
-                        metadata.len().min(checkpoint.expected_size)
-                    }
-                    Ok(_) => return Err(AppError::InvalidInput("partial download path")),
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
-                    Err(error) => return Err(AppError::Io(error)),
-                };
-            Ok(ResumableTransfer {
-                transfer_id: checkpoint.transfer_id,
-                name: file_name(&checkpoint.local_path)?,
-                direction: TransferDirection::Download,
-                recovery_kind: RecoveryKind::ByteResume,
-                bytes_transferred,
-                total_bytes: checkpoint.expected_size,
-            })
-        }
-        TransferCheckpoint::Upload(checkpoint) => Ok(ResumableTransfer {
-            transfer_id: checkpoint.transfer_id,
-            name: file_name(&checkpoint.local_path)?,
-            direction: TransferDirection::Upload,
-            recovery_kind: RecoveryKind::Restart,
-            bytes_transferred: 0,
-            total_bytes: checkpoint.expected_size,
-        }),
-    }
-}
-
-fn file_name(path: &std::path::Path) -> Result<String, AppError> {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(str::to_owned)
-        .ok_or(AppError::InvalidInput("checkpoint file name"))
 }
 
 fn validate_transfer_id(transfer_id: &str) -> Result<(), AppError> {

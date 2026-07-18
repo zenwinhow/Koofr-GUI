@@ -36,4 +36,39 @@ describe('TransferPanel', () => {
     expect(onResume).toHaveBeenCalledWith('transfer-1')
     expect(screen.getByText('已暂停 · 64 B')).toBeTruthy()
   })
+
+
+  it('offers chunk resume for an interrupted large-file upload', async () => {
+    // Given
+    const user = userEvent.setup()
+    const onResume = vi.fn()
+    render(
+      <TransferPanel
+        visible
+        items={[{
+          id: 'transfer-2',
+          name: 'archive.tar',
+          direction: 'upload',
+          state: 'paused',
+          bytesTransferred: 64,
+          totalBytes: 256,
+          localKind: 'file',
+          recoveryKind: 'chunk_resume',
+        }]}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onResume={onResume}
+        onDiscard={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenFolder={vi.fn()}
+        onClearFinished={vi.fn()}
+      />,
+    )
+
+    // When
+    await user.click(screen.getByRole('button', { name: '继续上传 archive.tar' }))
+
+    // Then
+    expect(onResume).toHaveBeenCalledWith('transfer-2')
+  })
 })

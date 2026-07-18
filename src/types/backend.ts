@@ -107,7 +107,7 @@ export interface TrashRestoreTarget {
 
 export type TransferDirection = 'upload' | 'download'
 export type TransferState = 'running' | 'paused' | 'completed' | 'cancelled' | 'failed'
-export type RecoveryKind = 'byte_resume' | 'restart'
+export type RecoveryKind = 'byte_resume' | 'chunk_resume' | 'restart'
 
 export interface TransferProgress {
   transferId: string

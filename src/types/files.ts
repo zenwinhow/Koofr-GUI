@@ -10,6 +10,13 @@ export type FileKind =
   | 'executable'
   | 'file'
 
+export type UploadMode = 'compatible' | 'split'
+
+export interface SplitUploadSettings {
+  readonly packageName: string
+  readonly partBytes: number
+}
+
 export interface TransferItem {
   readonly id: string
   readonly name: string

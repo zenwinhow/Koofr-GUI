@@ -3,14 +3,9 @@
 当前后端实现普通 Koofr 文件管理的首个可测试切片：
 
 - `src/file_ops/`：挂载点 ID、远程路径、远程名称和本地选择路径的校验。
-<<<<<<< HEAD
-- `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除及内容请求。
-- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、单文件 Range 续传、持久化恢复检查点、递归目录清单、进度事件和取消。
-=======
 - `src/koofr_api/`：认证、挂载点、目录列表、建夹、复制、移动、删除、内容请求及基础分享链接请求。
 - `src/link_commands.rs`：下载链接与接收文件链接的查询、创建和撤销命令。
-- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、递归目录清单、进度事件、取消和下载临时内容清理。
->>>>>>> main
+- `src/transfer/`、`src/folder_download.rs`：流式上传/下载、单文件 Range 续传、通用二进制分卷续传、持久化恢复检查点、递归目录清单、进度事件、取消和下载临时内容清理。
 - `src/commands.rs`：暴露给 WebView 的窄范围 Tauri 命令。
 - `src/crypto/`、`src/vault_core/`：仍为空，Vault 尚未实现。
 - `src/credential_manager.rs`：把用户明确选择保存的应用专用密码写入 Windows 凭据管理器；密码不会进入普通配置。
@@ -49,15 +44,14 @@
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、
 `list_public_links`、`create_public_link`、`delete_public_link`、
 `empty_trash`、`create_folder`、`rename_entry`、`move_entry`、`copy_entry`、
-`delete_entry`、`upload_file`、`download_file`、`download_folder`、`cancel_transfer`、
+`delete_entry`、`upload_file`、`upload_split_file`、`download_file`、`download_folder`、`cancel_transfer`、
 `list_resumable_transfers`、`resume_transfer`、`discard_resumable_transfer`。
 
 传输通过 `koofr://transfer-progress` 事件报告运行、暂停、完成、取消或失败状态；事件不包含
 本地或远程文件名。对应 TypeScript 封装位于 `src/services/koofr.ts`。
 
 Koofr 官方 Go 客户端公开了 `FilesGetRange`，因此下载可以进行真实的字节级续传。公开
-上传协议及 rclone 的 Koofr 后端只有整文件 `FilesPut`，没有分块上传会话或已确认偏移；
-应用会持久化中断上传并提供“重新上传”，但不会把整文件重传标记为字节续传。
+上传协议及 rclone 的 Koofr 后端只有整文件 `FilesPut`，没有针对单个普通文件的分块上传会话或已确认偏移。普通上传会持久化中断任务并提供“重新上传”，不会把整文件重传标记为字节续传。用户明确选择“可续传大文件”时，后端创建独立远端文件夹，把原文件切为可自定义大小的 `part-*.bin`，只从最后一个已确认完整分卷继续；完成后写入通用恢复命令、分卷和整文件 SHA-256 及开放 JSON 清单。分卷可直接用系统自带 `copy /b` 或 `cat` 拼接，不需要本客户端。
 
 ## 检查
 

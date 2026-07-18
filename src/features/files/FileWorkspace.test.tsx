@@ -106,4 +106,30 @@ describe('FileWorkspace', () => {
 
     expect(onShare).toHaveBeenCalledWith(file)
   })
+
+  it('lets the user choose a compatible or resumable upload mode', async () => {
+    // Given
+    const user = userEvent.setup()
+    const onUpload = vi.fn()
+    render(
+      <FileWorkspace
+        mounts={[]}
+        activeMountId="mount-1"
+        path="/Videos"
+        files={[]}
+        loading={false}
+        error=""
+        lastSyncedAt={null}
+        {...defaultCallbacks}
+        onUpload={onUpload}
+      />,
+    )
+
+    // When
+    await user.click(screen.getByRole('button', { name: '选择上传方式' }))
+    await user.click(screen.getByRole('menuitem', { name: /可续传大文件/ }))
+
+    // Then
+    expect(onUpload).toHaveBeenCalledWith('split')
+  })
 })

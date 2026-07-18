@@ -13,6 +13,7 @@ import { isCollectionView, useKoofrCollections } from './features/files/useKoofr
 import { useKoofrWorkspace } from './features/files/useKoofrWorkspace'
 import { SettingsPanel } from './features/settings/SettingsPanel'
 import { DownloadDestinationDialog } from './features/transfers/DownloadDestinationDialog'
+import { SplitUploadDialog } from './features/transfers/SplitUploadDialog'
 import { TransferPanel } from './features/transfers/TransferPanel'
 import { beginDownload } from './features/transfers/beginDownload'
 import {
@@ -26,18 +27,26 @@ import type {
   AppSettings,
   CacheMode,
   LocatedFile,
+  LocalFileSelection,
   RemoteFile,
   TransferProgress,
+  TransferResult,
   TrashItem,
 } from './types/backend'
-import type { TransferItem } from './types/files'
+import type { SplitUploadSettings, TransferItem, UploadMode } from './types/files'
 
-type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'share' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
+type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'splitUpload' | 'share' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
 type AuthState = 'checking' | 'signedOut' | 'signingIn' | 'signedIn'
 
 interface PendingDownload {
   readonly file: RemoteFile
   readonly mountId: string
+}
+
+interface PendingSplitUpload {
+  readonly selection: LocalFileSelection
+  readonly mountId: string
+  readonly path: string
 }
 
 function App() {
@@ -59,6 +68,7 @@ function App() {
   const [settingsError, setSettingsError] = useState('')
   const [downloadSettingsError, setDownloadSettingsError] = useState('')
   const [pendingDownload, setPendingDownload] = useState<PendingDownload | null>(null)
+  const [pendingSplitUpload, setPendingSplitUpload] = useState<PendingSplitUpload | null>(null)
   const [downloadDirectory, setDownloadDirectory] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
@@ -289,61 +299,86 @@ function App() {
     }
   }
 
-  const handleUpload = async () => {
+  const startSelectedUpload = async (
+    selection: LocalFileSelection,
+    uploadMountId: string,
+    uploadPath: string,
+    splitSettings: SplitUploadSettings | null,
+  ) => {
+    const transfer = splitSettings
+      ? koofr.uploadSplitFile(uploadMountId, uploadPath, selection.grantId, splitSettings)
+      : koofr.uploadFile(uploadMountId, uploadPath, selection.grantId)
+    setTransfers((current) => [{
+      id: transfer.transferId,
+      name: selection.fileName,
+      direction: 'upload',
+      state: 'running',
+      bytesTransferred: 0,
+      totalBytes: null,
+      localKind: 'file',
+      recoveryKind: splitSettings ? 'chunk_resume' : 'restart',
+    }, ...current])
+    setTransferVisible(true)
+
+    let result: TransferResult
+    try {
+      result = await transfer.result
+    } catch (error) {
+      setTransfers((current) => current.map((item) => item.id === transfer.transferId
+        ? {
+            ...item,
+            state: isCommandErrorCode(error, 'transfer_paused')
+              ? 'paused'
+              : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
+          }
+        : item))
+      showNotice(commandErrorMessage(error, '上传失败，请稍后重试。'))
+      return
+    }
+    setTransfers((current) => current.map((item) => item.id === transfer.transferId
+      ? {
+          ...item,
+          state: 'completed',
+          bytesTransferred: result.bytesTransferred,
+          totalBytes: item.totalBytes ?? result.bytesTransferred,
+        }
+      : item))
+    if (
+      workspaceLocation.current.activeMountId === uploadMountId
+      && workspaceLocation.current.path === uploadPath
+    ) {
+      try {
+        await workspace.loadDirectory(uploadMountId, uploadPath, true)
+      } catch (error) {
+        showNotice(commandErrorMessage(error, '上传已完成，但当前文件夹刷新失败。'))
+      }
+    }
+  }
+
+  const handleUpload = async (mode: UploadMode) => {
     if (!workspace.activeMountId) return
     const uploadMountId = workspace.activeMountId
     const uploadPath = workspace.path
     try {
       const selection = await koofr.selectUploadFile()
       if (!selection) return
-
-      const transfer = koofr.uploadFile(
-        uploadMountId,
-        uploadPath,
-        selection.grantId,
-      )
-      setTransfers((current) => [{
-        id: transfer.transferId,
-        name: selection.fileName,
-        direction: 'upload',
-        state: 'running',
-        bytesTransferred: 0,
-        totalBytes: null,
-        localKind: 'file',
-        recoveryKind: 'restart',
-      }, ...current])
-      setTransferVisible(true)
-
-      try {
-        const result = await transfer.result
-        setTransfers((current) => current.map((item) => item.id === transfer.transferId
-          ? {
-              ...item,
-              state: 'completed',
-              bytesTransferred: result.bytesTransferred,
-              totalBytes: item.totalBytes ?? result.bytesTransferred,
-            }
-          : item))
-        if (
-          workspaceLocation.current.activeMountId === uploadMountId
-          && workspaceLocation.current.path === uploadPath
-        ) {
-          await workspace.loadDirectory(uploadMountId, uploadPath, true)
-        }
-      } catch (error) {
-        setTransfers((current) => current.map((item) => item.id === transfer.transferId
-          ? {
-              ...item,
-              state: isCommandErrorCode(error, 'transfer_paused')
-                ? 'paused'
-                : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
-            }
-          : item))
-        showNotice(commandErrorMessage(error, '上传失败，请稍后重试。'))
+      if (mode === 'split') {
+        setPendingSplitUpload({ selection, mountId: uploadMountId, path: uploadPath })
+        setModalKind('splitUpload')
+        return
       }
+      await startSelectedUpload(selection, uploadMountId, uploadPath, null)
     } catch (error) {
       showNotice(commandErrorMessage(error, '无法选择本地文件。'))
     }
+  }
+
+  const confirmSplitUpload = (settings: SplitUploadSettings) => {
+    if (!pendingSplitUpload) return
+    const pending = pendingSplitUpload
+    setPendingSplitUpload(null)
+    setModalKind(null)
+    void startSelectedUpload(pending.selection, pending.mountId, pending.path, settings)
   }
 
   const startDownload = async (
@@ -731,7 +766,7 @@ function App() {
               onRefresh={() => void (workspace.activeMountId ? workspace.refresh() : workspace.initialize())}
               onCreateFolder={openCreateFolder}
               onThemeOpen={() => setModalKind('theme')}
-              onUpload={() => void handleUpload()}
+              onUpload={(mode) => void handleUpload(mode)}
               onDownload={(file) => void handleDownload(file)}
               onShare={openShare}
               onRename={openRename}
@@ -790,6 +825,17 @@ function App() {
             setDownloadError('')
           }}
           onConfirm={(directory, askEveryTime) => void confirmDownload(directory, askEveryTime)}
+        />
+      ) : null}
+
+      {authState === 'signedIn' && modalKind === 'splitUpload' && pendingSplitUpload ? (
+        <SplitUploadDialog
+          fileName={pendingSplitUpload.selection.fileName}
+          onClose={() => {
+            setModalKind(null)
+            setPendingSplitUpload(null)
+          }}
+          onConfirm={confirmSplitUpload}
         />
       ) : null}
 

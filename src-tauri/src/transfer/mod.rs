@@ -1,15 +1,27 @@
 mod checkpoint;
+mod checkpoint_snapshot;
 mod download;
 mod manager;
 mod model;
 mod part;
 mod range;
+mod split_package;
+#[cfg(test)]
+#[path = "split_package_tests.rs"]
+mod split_package_tests;
+mod split_part_io;
+mod split_support;
+mod split_upload;
 mod upload;
 
 pub use checkpoint::{ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
 pub use manager::TransferManager;
 pub use model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal};
+pub use split_upload::{
+    SplitTransferRuntime, SplitUploadRequest, resume_split_upload, upload_split,
+    validate_split_part_bytes,
+};
 pub use upload::{retry_upload, upload};
 
 pub struct ResumeOutcome {
@@ -36,6 +48,22 @@ pub async fn resume_checkpoint(
             Ok(ResumeOutcome {
                 result,
                 completed_path: Some(completed_path),
+            })
+        }
+        checkpoint::TransferCheckpoint::SplitUpload(_) => {
+            let result = resume_split_upload(
+                SplitTransferRuntime {
+                    app,
+                    api,
+                    manager,
+                    checkpoints: store,
+                },
+                transfer_id,
+            )
+            .await?;
+            Ok(ResumeOutcome {
+                result,
+                completed_path: None,
             })
         }
         checkpoint::TransferCheckpoint::Upload(_) => {

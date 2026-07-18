@@ -13,11 +13,12 @@ import {
   Search,
   Share2,
   Trash2,
-  UploadCloud,
 } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { FileTypeIcon } from '../../components/FileTypeIcon'
 import type { KoofrMount, RemoteFile } from '../../types/backend'
+import type { UploadMode } from '../../types/files'
+import { UploadModeMenu } from './UploadModeMenu'
 import {
   fileKind,
   formatBytes,
@@ -39,7 +40,7 @@ interface FileWorkspaceProps {
   onRefresh: () => void
   onCreateFolder: () => void
   onThemeOpen: () => void
-  onUpload: () => void
+  onUpload: (mode: UploadMode) => void
   onDownload: (file: RemoteFile) => void
   onShare: (file: RemoteFile) => void
   onRename: (file: RemoteFile) => void
@@ -188,9 +189,7 @@ export function FileWorkspace({
           />
         </label>
         <div className="top-actions">
-          <button className="primary-button" type="button" onClick={onUpload} disabled={!activeMountId || loading}>
-            <UploadCloud size={18} />上传
-          </button>
+          <UploadModeMenu disabled={!activeMountId || loading} onSelect={onUpload} />
           <div className="menu-anchor" ref={newMenuRef}>
             <button
               className="secondary-button"

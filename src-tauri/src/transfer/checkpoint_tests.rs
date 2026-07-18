@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
+use crate::transfer::split_package::SplitPart;
+
 use super::{
-    DownloadCheckpoint, RecoveryKind, TransferCheckpoint, TransferCheckpointStore, UploadCheckpoint,
+    DownloadCheckpoint, RecoveryKind, SplitUploadCheckpoint, TransferCheckpoint,
+    TransferCheckpointStore, UploadCheckpoint,
 };
 
 #[tokio::test]
@@ -67,4 +70,47 @@ async fn persists_download_offsets_and_upload_restart_semantics() {
     }));
 
     std::fs::remove_dir_all(directory).expect("remove transfer test directory");
+}
+
+#[tokio::test]
+async fn reports_only_committed_chunks_for_resumable_uploads() {
+    // Given
+    let directory = std::env::temp_dir().join(format!("koofr-chunk-test-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).expect("create chunk test directory");
+    let state_path = directory.join("transfers.json");
+    let transfer_id = uuid::Uuid::new_v4().to_string();
+    let store = TransferCheckpointStore::load(state_path.clone());
+    store
+        .insert(TransferCheckpoint::SplitUpload(SplitUploadCheckpoint {
+            transfer_id: transfer_id.clone(),
+            owner_id: "user-1".to_owned(),
+            mount_id: "mount_1".to_owned(),
+            remote_directory: "/Videos".to_owned(),
+            package_path: format!("/Videos/movie.mkv.parts-{transfer_id}"),
+            local_path: PathBuf::from(r"C:\files\movie.mkv"),
+            expected_size: 256,
+            modified_millis: 84,
+            chunk_size: 64,
+            completed_chunks: vec![
+                SplitPart::new(0, 64, "hash-0".to_owned()),
+                SplitPart::new(1, 64, "hash-1".to_owned()),
+            ],
+        }))
+        .await
+        .expect("save chunk upload checkpoint");
+
+    // When
+    let reloaded = TransferCheckpointStore::load(state_path);
+    let snapshots = reloaded
+        .list("user-1")
+        .await
+        .expect("list resumable chunk uploads");
+
+    // Then
+    assert_eq!(snapshots.len(), 1);
+    assert_eq!(snapshots[0].recovery_kind, RecoveryKind::ChunkResume);
+    assert_eq!(snapshots[0].bytes_transferred, 128);
+    assert_eq!(snapshots[0].total_bytes, 256);
+
+    std::fs::remove_dir_all(directory).expect("remove chunk test directory");
 }

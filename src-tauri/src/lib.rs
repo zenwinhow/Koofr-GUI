@@ -10,6 +10,7 @@ mod local_access;
 mod local_open;
 mod metadata_cache;
 mod settings;
+mod split_commands;
 mod transfer;
 mod transfer_commands;
 
@@ -88,6 +89,7 @@ pub fn run() {
             commands::copy_entry,
             commands::delete_entry,
             commands::upload_file,
+            split_commands::upload_split_file,
             commands::download_file,
             folder_commands::download_folder,
             commands::open_downloaded_file,

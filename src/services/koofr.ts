@@ -16,6 +16,7 @@ import type {
   TrashList,
   CommandError,
 } from '../types/backend'
+import type { SplitUploadSettings } from '../types/files'
 
 const TRANSFER_EVENT = 'koofr://transfer-progress'
 
@@ -205,6 +206,28 @@ export const koofr = {
         mountId,
         remoteDirectory,
         localPathGrant,
+      }),
+    }
+  },
+
+  uploadSplitFile(
+    mountId: string,
+    remoteDirectory: string,
+    localPathGrant: string,
+    settings: SplitUploadSettings,
+  ) {
+    const transferId = crypto.randomUUID()
+    return {
+      transferId,
+      result: invoke<TransferResult>('upload_split_file', {
+        request: {
+          transferId,
+          mountId,
+          remoteDirectory,
+          localPathGrant,
+          packageName: settings.packageName,
+          partBytes: settings.partBytes,
+        },
       }),
     }
   },
