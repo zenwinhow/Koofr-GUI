@@ -4,6 +4,12 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [1.3.2] - 2026-07-19
+
+### Changes
+
+- Fix Rust formatting required by the release workflow
+
 ## [1.3.1] - 2026-07-19
 
 ### Changes
