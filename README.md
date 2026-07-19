@@ -1,28 +1,28 @@
 # Koofr-GUI
 
-Koofr-GUI 是一个 Windows 优先的 Koofr 桌面文件管理客户端，采用 Tauri v2、React、TypeScript 和 Rust 构建。项目目标是提供接近原生文件管理器的体验，而不是简单封装 Koofr 网页。
+Windows 上用的 Koofr 桌面客户端，用 Tauri v2 + React + TypeScript + Rust 凑出来的。想做成原生文件管理器那种感觉，而不是套个网页壳子完事。
 
-> 1.0.0 作为首个正式 Windows 发行版本，提供普通 Koofr 文件管理功能；Koofr Vault 兼容层尚未实现，因此 Vault 工作流不属于此版本范围。
+当前版本 1.3.2，普通 Koofr 文件管理基本能用了。Vault 还没动。
 
-## 当前功能
+## 现在能干什么
 
-- Koofr 应用专用密码登录、启动时恢复会话和退出登录。
-- 可选使用 Windows Credential Manager 保存登录凭据；密码不会写入普通配置或 WebView 存储。
+- 用 Koofr 应用专用密码登录，下次启动能自动恢复会话，也能退出登录。
+- 登录凭据可以存到 Windows 凭据管理器里——不会写在普通配置文件里，也不会塞进 WebView 存储。
 - 浏览挂载点、目录、最近文件、共享内容和回收站。
-- 识别并浏览账户中已有的 Koofr、Google Drive、OneDrive、Dropbox 等存储位置。
-- 查询、创建和撤销下载链接与接收文件链接；链接撤销需要二次确认。
-- 新建文件夹、普通上传、通用分卷可续传上传、单文件与递归文件夹下载、重命名、移动、复制、删除和回收站恢复。
-- 流式传输、目录累计进度和取消操作；单文件下载使用 HTTP Range 与磁盘检查点进行字节级续传。可续传大文件上传会创建用户命名的远端文件夹，按自定义大小提交原始二进制分卷，并在中断后从已确认的完整分卷继续。
-- 可配置默认下载文件夹；可选择每次下载前询问位置，支持手填路径或原生文件夹选择器，并自动为重名下载追加序号而不覆盖已有内容。
-- 可配置的内存/磁盘元数据缓存和响应式桌面界面。
+- 能认出来账户里已有的 Koofr、Google Drive、OneDrive、Dropbox 这些存储位置。
+- 查、建、撤下载链接和接收文件链接。撤销链接会弹二次确认。
+- 新建文件夹、传文件、分卷续传大文件、下载单文件或递归下载整个文件夹、重命名、移动、复制、删除、从回收站恢复。
+- 传输有进度显示，能取消。单文件下载用 HTTP Range 加磁盘检查点做字节级续传。分卷上传会建一个用户命名的远端文件夹，切成自定义大小的原始二进制分卷，断了之后从最后一个完整的分卷接着传。
+- 默认下载文件夹可以配置。每次下载前可以选问我要位置，支持手填路径或者用原生文件夹选择器。重名文件自动加序号，不会覆盖已有的。
+- 元数据缓存可选内存或磁盘，界面做了响应式布局。
 
-Koofr 的公开整文件上传接口不提供原文件的分块会话或服务端偏移确认，因此普通上传中断后仍需重新发送整个文件。“可续传大文件”是明确选择的互操作方案：远端显示为一个文件夹，内部的 `part-*.bin` 不含专有文件头，可用 Windows `copy /b` 或 Linux/macOS `cat` 还原；文件夹内同时提供 `README.txt`、恢复脚本、`SHA256SUMS` 和 `manifest.json`。它不会伪装成 Koofr 中的单个普通文件。
+Koofr 的公开上传接口不提供分块会话或服务端偏移确认，所以普通上传断了就得重传整个文件。分卷续传是明确选出来的互操作方案：远端显示为一个文件夹，里面的 `part-*.bin` 不含专有文件头，用 Windows 的 `copy /b` 或者 Linux/macOS 的 `cat` 就能拼回去。文件夹里还放了 `README.txt`、恢复脚本、`SHA256SUMS` 和 `manifest.json`。它不会假装成 Koofr 里的一个普通文件。
 
-尚未实现：Koofr Vault 解锁与加解密、Vault 传输。OAuth 登录和第三方存储的新增、移除、重授权仍需 Koofr 提供公版桌面客户端注册信息及公开授权 API；当前界面会展示已有连接，并引导到官方账户页面管理授权，不会复用网页 Cookie 或内置其他客户端的密钥。
+还没做的：Koofr Vault 解锁、加解密、Vault 传输。OAuth 登录和第三方存储的新增、移除、重授权得等 Koofr 提供公版桌面客户端注册信息和公开授权 API。当前界面能展示已有的连接，引导用户去官方账户页面管理授权——不会复用网页 Cookie 也不会内置其他客户端的密钥。
 
-## 快速开始
+## 跑起来
 
-构建环境需要 Node.js 24 LTS、npm 10+、Rust 1.88+ MSVC 工具链、Visual Studio C++ Build Tools、Windows SDK 和 WebView2。
+需要 Node.js 24 LTS、npm 10+、Rust 1.88+ MSVC 工具链、Visual Studio C++ Build Tools、Windows SDK 和 WebView2。具体安装步骤看[构建指南](docs/BUILDING.md)。
 
 ```powershell
 git clone <仓库地址>
@@ -31,96 +31,94 @@ npm ci
 npm run dev:desktop
 ```
 
-仅运行前端开发服务器：
+只跑前端开发服务器（浏览器里看）：
 
 ```powershell
 npm run dev
 ```
 
-完整的环境安装、检查、发布构建、产物位置、故障排查和清理说明请阅读 [构建与清理指南](docs/BUILDING.md)。
-
-## 构建与检查
+## 构建和检查
 
 ```powershell
-# 运行 ESLint、前端生产构建、Rust 格式检查、Clippy 和单元测试
+# 跑 ESLint、前端生产构建、Rust 格式检查、Clippy 和单元测试
 npm run check
 
-# 构建 Windows 发布版可执行文件
+# 构建 Windows 发布版 exe
 npm run build:desktop
 ```
 
-发布版可执行文件输出到 `src-tauri/target/release/koofr-gui.exe`，NSIS 安装程序输出到 `src-tauri/target/release/bundle/nsis/`。
+发布版 exe 生成在 `src-tauri/target/release/koofr-gui.exe`，NSIS 安装包在 `src-tauri/target/release/bundle/nsis/`。
 
 ## 清理
 
 ```powershell
-# 删除前端、Rust 和 Tauri 的可再生成构建产物，保留已安装依赖
+# 删前端、Rust 和 Tauri 的构建产物，保留已安装依赖
 npm run clean
 
-# 同时删除 node_modules；之后需要重新执行 npm ci
+# 连 node_modules 一起删；之后得重新 npm ci
 npm run clean:all
 ```
 
-清理脚本只操作仓库内的固定目录，不删除源码、锁文件、Windows 凭据或应用用户数据。各命令的准确删除范围见 [构建与清理指南](docs/BUILDING.md#6-清理构建产物)。
+清理脚本只动仓库里的固定目录，不删源码、锁文件、Windows 凭据或应用用户数据。具体删什么见[构建指南](docs/BUILDING.md#6-清理构建产物)。
 
 ## 常用命令
 
-| 命令 | 用途 |
+| 命令 | 干什么用的 |
 | --- | --- |
-| `npm ci` | 按 `package-lock.json` 可复现地安装依赖 |
+| `npm ci` | 按 `package-lock.json` 装依赖，可复现 |
 | `npm run dev` | 启动 Vite 前端开发服务器 |
 | `npm run dev:desktop` | 启动完整 Tauri 桌面开发环境 |
-| `npm run build` | 类型检查并生成 `dist/` 前端资源 |
-| `npm run build:desktop` | 构建 Windows 发布版可执行文件（不生成安装包） |
-| `npm run build:installer` | 显式构建 NSIS 安装包（发布流程使用） |
-| `npm run verify:quick` | 快速验证 lint、拆分上传测试和前端构建 |
-| `npm run verify:full` | 完整验证，等同于 `npm run check` |
-| `npm run check` | 运行全部前端和 Rust 检查 |
-| `npm run clean` | 清理构建产物并保留依赖 |
-| `npm run clean:all` | 清理构建产物和 `node_modules/` |
+| `npm run build` | 类型检查 + 生成 `dist/` 前端资源 |
+| `npm run build:desktop` | 构建 Windows 发布版 exe（不生成安装包） |
+| `npm run build:installer` | 显式构建 NSIS 安装包（发布流程用） |
+| `npm run verify:quick` | 快速验证：lint + 拆分上传测试 + 前端构建 |
+| `npm run verify:full` | 完整验证，等同 `npm run check` |
+| `npm run check` | 跑全部前端和 Rust 检查 |
+| `npm run clean` | 清理构建产物，保留依赖 |
+| `npm run clean:all` | 清理构建产物 + `node_modules/` |
 
 ## 目录结构
 
-```text
+```
 Koofr-GUI/
-|-- docs/                 项目文档和设计资料
-|-- public/               前端静态资源
-|-- scripts/              项目维护脚本
-|-- src/                  React / TypeScript 界面与 Tauri 调用封装
-|-- src-tauri/            Rust / Tauri 后端、权限和桌面配置
-|-- package.json          npm 命令与前端依赖
-|-- package-lock.json     锁定的 JavaScript 依赖
-`-- src-tauri/Cargo.lock  锁定的 Rust 依赖
+├── docs/                 文档和设计资料
+├── public/               前端静态资源
+├── scripts/              维护脚本
+├── src/                  React / TypeScript 界面和 Tauri 调用封装
+├── src-tauri/            Rust / Tauri 后端、权限、桌面配置
+├── package.json          npm 命令和前端依赖
+├── package-lock.json     锁定的 JavaScript 依赖
+└── src-tauri/Cargo.lock  锁定的 Rust 依赖
 ```
 
-前端目录职责见 [src/README.md](src/README.md)，Rust/Tauri 边界和命令说明见 [src-tauri/README.md](src-tauri/README.md)。
+前端目录职责看 [src/README.md](src/README.md)，Rust 后端命令说明看 [src-tauri/README.md](src-tauri/README.md)。
 
-## 架构与安全边界
+## 架构和安全边界
 
-```text
-React + TypeScript UI (`src/`)
+```
+React + TypeScript UI (src/)
         |
-        | typed, narrowly scoped Tauri commands/events
+        | typed Tauri 命令/事件，接口很窄
         v
-Rust + Tauri core (`src-tauri/src/`)
-        |-- file_ops/            路径与文件操作校验
-        |-- transfer/            上传、下载、进度与取消
-        |-- koofr_api/           Koofr REST API
-        |-- credential_manager/  Windows 安全凭据存储
-        |-- vault_core/          计划中的 Vault 兼容层
-        `-- crypto/              计划中的加密支持
+Rust + Tauri core (src-tauri/src/)
+├── file_ops/            路径与文件操作校验
+├── transfer/            上传、下载、进度、取消
+├── koofr_api/           Koofr REST API
+├── credential_manager/  Windows 安全凭据存储
+├── vault_core/          计划中的 Vault 兼容层
+└── crypto/              计划中的加密支持
 ```
 
-凭据、文件系统访问、网络请求和未来的 Vault 密钥处理均保留在 Rust 边界内。前端只调用受限且类型化的 Tauri 命令，不应保存密码、令牌或 Vault Safe Key。
+凭据、文件系统访问、网络请求这些不会放进前端。前端只调受限的 Tauri 命令，不碰密码、令牌或 Vault Safe Key。
 
 ## 开发约定
 
-- 使用 `npm ci` 和已提交的两个锁文件，不随意升级依赖。
-- 编辑器遵循根目录 `.editorconfig`；文本文件统一使用 UTF-8 和 LF 换行。
-- 提交前运行 `npm run check`。
-- 不提交构建产物、依赖目录、账号凭据、访问令牌或真实 Secret 形式的测试数据。
-- 新增 Tauri 命令时必须在 Rust 侧验证路径、远程标识符和操作范围。
-- 下载目录可以由用户在界面中明确填写，但前端不能拼接最终文件名；Rust 必须验证父目录、清理远端名称、避免覆盖并签发一次性下载授权。
-- Vault 功能必须兼容 Koofr/rclone crypt，不能创建自定义加密格式。
+- 用 `npm ci` 和两个锁文件，别乱升级依赖。
+- 编辑器配好 `.editorconfig`；文本文件一律 UTF-8 + LF。
+- 提交前跑 `npm run check`。
+- 不提交构建产物、依赖目录、账号凭据、访问令牌或长得像 secret 的测试数据。
+- 加新 Tauri 命令时，Rust 侧必须验证路径、远程标识符和操作范围。
+- 下载目录用户可以手填，但前端不能拼最终文件名。Rust 负责验证父目录、清理远端名称、避免覆盖、签发一次性下载授权。
+- Vault 功能必须兼容 Koofr/rclone crypt，不能自己搞一套加密格式。
 
-推送与版本号完全匹配的 `v*` 标签会触发 GitHub Actions：执行质量检查、构建 NSIS 安装程序并创建同名 GitHub Release。发布包目前不进行代码签名；Windows 可能显示未知发布者或 SmartScreen 警告，用户应仅从本仓库 Release 页面下载。版本规则和操作步骤见 [发布流程](docs/RELEASING.md)。
+推送和版本号完全匹配的 `v*` 标签会触发 GitHub Actions：跑质量检查、构建 NSIS 安装程序、创建同名 GitHub Release。发布包目前不签名，Windows 可能显示未知发布者或 SmartScreen 警告。建议只从本仓库 Release 页面下载。版本规则和操作步骤见[发布流程](docs/RELEASING.md)。

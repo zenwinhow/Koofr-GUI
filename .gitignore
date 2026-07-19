@@ -1,6 +1,11 @@
-# Local instructions for coding agents. This file can contain machine- or
-# workflow-specific project context and must not be committed.
+# Local instructions and tooling for coding agents. These files can contain
+# machine- or workflow-specific project context and must not be committed.
 /AGENTS.md
+/CLAUDE.md
+/.agents/
+/.claude/
+/.omo/
+/skills-lock.json
 
 # Frontend dependencies and build output.
 /node_modules/
