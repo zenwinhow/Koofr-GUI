@@ -2,6 +2,12 @@
 
 格式按 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号按 [SemVer](https://semver.org/spec/v2.0.0.html)。
 
+## [1.3.3] - 2026-07-20
+
+### Changes
+
+- Fix transfer progress resetting to 0% when paused
+
 ## [1.3.2] - 2026-07-19
 
 ### Changes
