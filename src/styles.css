@@ -1070,6 +1070,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .settings-section__heading h3 { margin: 0 0 4px; color: #292e34; font-size: 14px; }
 .settings-section__heading p { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
 .settings-path-field { display: grid; gap: var(--space-2); color: #353a41; font-size: 12px; font-weight: 620; }
+.settings-path-field--spaced { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e4e7ea; }
 .settings-path-actions { min-height: 32px; margin-top: var(--space-2); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .settings-path-actions small { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 .settings-path-actions button { padding: 7px 10px; border: 1px solid #d4d8dd; border-radius: 6px; background: var(--surface); color: #555c65; font-size: 10.5px; cursor: pointer; }
@@ -1128,6 +1129,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: #343940;
   font-size: 11.5px;
 }
+.settings-row--compact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  row-gap: 10px;
+}
+.settings-row--compact-grid label:not(:first-child) { padding-top: 10px; border-top: 1px solid #e8eaed; }
+.settings-row--compact-grid select:not(:first-of-type) { margin-top: 10px; }
 .settings-storage { margin-top: 14px; display: flex; align-items: center; gap: 12px; color: #7a818a; font-size: 10.5px; }
 .settings-storage button,
 .saved-login button {

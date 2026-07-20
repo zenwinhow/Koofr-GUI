@@ -12,6 +12,13 @@ const SETTINGS: AppSettings = {
   savedEmail: null,
   downloadDirectory: 'C:\\Users\\Test\\Downloads',
   askDownloadLocation: true,
+  cacheDirectory: 'C:\\Users\\Test\\AppData\\Cache',
+  logDirectory: 'C:\\Users\\Test\\AppData\\Logs',
+  logLevel: 'info',
+  logRetentionDays: 14,
+  logMaxFileSizeMb: 10,
+  logFiles: 2,
+  logDiskBytes: 2048,
 }
 
 function renderSettings(overrides: Partial<Parameters<typeof SettingsPanel>[0]> = {}) {
@@ -23,9 +30,13 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsPanel>[0]> 
     downloadError: '',
     onCacheModeChange: vi.fn(),
     onCacheTtlChange: vi.fn(),
+    onCacheDirectoryChange: vi.fn(),
+    onLoggingSettingsChange: vi.fn(),
     onDownloadSettingsChange: vi.fn(),
     onBrowseDownloadDirectory: vi.fn(async () => null),
+    onBrowseSettingsDirectory: vi.fn(async () => null),
     onClearCache: vi.fn(),
+    onClearLogs: vi.fn(),
     onForgetLogin: vi.fn(),
     ...overrides,
   }
@@ -41,7 +52,7 @@ describe('SettingsPanel download preferences', () => {
 
     await user.clear(input)
     await user.type(input, 'D:\\Koofr Downloads')
-    await user.click(screen.getByRole('button', { name: '保存路径' }))
+    await user.click(screen.getByRole('button', { name: '保存下载路径' }))
 
     expect(props.onDownloadSettingsChange).toHaveBeenCalledWith('D:\\Koofr Downloads', true)
   })
@@ -66,5 +77,41 @@ describe('SettingsPanel download preferences', () => {
     expect(input.getAttribute('aria-invalid')).toBe('true')
     expect(input.getAttribute('aria-describedby')).toBe('settings-download-error')
     expect(screen.getByRole('alert').textContent).toContain('请选择一个已有的文件夹。')
+  })
+})
+
+describe('SettingsPanel storage and diagnostics', () => {
+  it('saves a selected cache directory', async () => {
+    const user = userEvent.setup()
+    const onCacheDirectoryChange = vi.fn()
+    renderSettings({
+      onBrowseSettingsDirectory: vi.fn(async (kind) => (
+        kind === 'cache' ? 'D:\\Koofr Cache' : null
+      )),
+      onCacheDirectoryChange,
+    })
+
+    await user.click(screen.getByRole('button', { name: '选择缓存文件夹' }))
+    await user.click(screen.getByRole('button', { name: '保存缓存路径' }))
+
+    expect(onCacheDirectoryChange).toHaveBeenCalledWith('D:\\Koofr Cache')
+  })
+
+  it('saves logging location, level, retention and rotation together', async () => {
+    const user = userEvent.setup()
+    const onLoggingSettingsChange = vi.fn()
+    renderSettings({ onLoggingSettingsChange })
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '记录级别' }), 'debug')
+    await user.selectOptions(screen.getByRole('combobox', { name: '保留时间' }), '30')
+    await user.selectOptions(screen.getByRole('combobox', { name: '单文件上限' }), '25')
+    await user.click(screen.getByRole('button', { name: '保存日志设置' }))
+
+    expect(onLoggingSettingsChange).toHaveBeenCalledWith({
+      logDirectory: 'C:\\Users\\Test\\AppData\\Logs',
+      logLevel: 'debug',
+      logRetentionDays: 30,
+      logMaxFileSizeMb: 25,
+    })
   })
 })

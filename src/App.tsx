@@ -27,6 +27,7 @@ import { readStoredTheme, storeTheme, type ThemeId } from './theme'
 import type {
   AppSettings,
   CacheMode,
+  LogLevel,
   LocatedFile,
   LocalFileSelection,
   RemoteFile,
@@ -210,15 +211,52 @@ function App() {
     }
   }
 
-  const updateCacheSettings = async (cacheMode: CacheMode, cacheTtlMinutes: number) => {
+  const updateCacheSettings = async (
+    cacheMode: CacheMode,
+    cacheTtlMinutes: number,
+    cacheDirectory: string,
+  ) => {
     setSettingsBusy(true)
     setSettingsError('')
     try {
-      setSettings(await koofr.updateSettings(cacheMode, cacheTtlMinutes))
+      setSettings(await koofr.updateSettings(cacheMode, cacheTtlMinutes, cacheDirectory))
     } catch (error) {
       setSettingsError(commandErrorMessage(error, '无法保存缓存设置。'))
     } finally {
       setSettingsBusy(false)
+    }
+  }
+
+  const updateLoggingSettings = async (
+    logDirectory: string,
+    logLevel: LogLevel,
+    logRetentionDays: number,
+    logMaxFileSizeMb: number,
+  ) => {
+    setSettingsBusy(true)
+    setSettingsError('')
+    try {
+      setSettings(await koofr.updateLoggingSettings(
+        logDirectory,
+        logLevel,
+        logRetentionDays,
+        logMaxFileSizeMb,
+      ))
+      showNotice('日志设置已保存')
+    } catch (error) {
+      setSettingsError(commandErrorMessage(error, '无法保存日志设置，请检查文件夹路径和参数。'))
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
+
+  const browseSettingsDirectory = async (kind: 'cache' | 'logs') => {
+    setSettingsError('')
+    try {
+      return await koofr.selectSettingsDirectory(kind)
+    } catch (error) {
+      setSettingsError(commandErrorMessage(error, '无法打开文件夹选择器。'))
+      return null
     }
   }
 
@@ -261,6 +299,19 @@ function App() {
       showNotice('文件信息缓存已清除')
     } catch (error) {
       setSettingsError(commandErrorMessage(error, '无法清除文件信息缓存。'))
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
+
+  const clearLogs = async () => {
+    setSettingsBusy(true)
+    setSettingsError('')
+    try {
+      setSettings(await koofr.clearLogs())
+      showNotice('诊断日志已清除')
+    } catch (error) {
+      setSettingsError(commandErrorMessage(error, '无法清除诊断日志。'))
     } finally {
       setSettingsBusy(false)
     }
@@ -537,7 +588,9 @@ function App() {
 
   const clearFinishedTransfers = () => {
     setTransfers((current) => current.filter((item) => (
-      item.state === 'running' || item.state === 'paused'
+      item.state === 'running'
+      || item.state === 'paused'
+      || (item.state === 'failed' && item.recoveryKind !== null)
     )))
   }
 
@@ -923,16 +976,39 @@ function App() {
             error={settingsError}
             downloadError={downloadSettingsError}
             onCacheModeChange={(cacheMode) => {
-              if (settings) void updateCacheSettings(cacheMode, settings.cacheTtlMinutes)
+              if (settings) void updateCacheSettings(
+                cacheMode,
+                settings.cacheTtlMinutes,
+                settings.cacheDirectory,
+              )
             }}
             onCacheTtlChange={(cacheTtlMinutes) => {
-              if (settings) void updateCacheSettings(settings.cacheMode, cacheTtlMinutes)
+              if (settings) void updateCacheSettings(
+                settings.cacheMode,
+                cacheTtlMinutes,
+                settings.cacheDirectory,
+              )
             }}
+            onCacheDirectoryChange={(cacheDirectory) => {
+              if (settings) void updateCacheSettings(
+                settings.cacheMode,
+                settings.cacheTtlMinutes,
+                cacheDirectory,
+              )
+            }}
+            onLoggingSettingsChange={(next) => void updateLoggingSettings(
+              next.logDirectory,
+              next.logLevel,
+              next.logRetentionDays,
+              next.logMaxFileSizeMb,
+            )}
             onDownloadSettingsChange={(directory, askDownloadLocation) => {
               void updateDownloadSettings(directory, askDownloadLocation)
             }}
             onBrowseDownloadDirectory={browseSettingsDownloadDirectory}
+            onBrowseSettingsDirectory={browseSettingsDirectory}
             onClearCache={() => void clearMetadataCache()}
+            onClearLogs={() => void clearLogs()}
             onForgetLogin={() => void forgetSavedLogin()}
           />
         </Modal>

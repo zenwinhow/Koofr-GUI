@@ -188,7 +188,8 @@ App data lives under the current Windows user's local data directory (`identifie
 %LOCALAPPDATA%\net.koofr.desktop.gui\
 ├─ settings.json                # app settings
 ├─ transfer-checkpoints.json    # resumable transfer checkpoints
-└─ metadata-cache/              # metadata cache when disk mode is on
+├─ cache/metadata-cache.json    # default disk cache location (configurable)
+└─ logs/koofr-gui*.jsonl       # redacted diagnostic logs (configurable)
 ```
 
 **Credentials are NOT here** — the Koofr app-specific password is stored in the Windows Credential Manager and survives reinstalls and rebuilds.

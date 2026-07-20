@@ -17,7 +17,10 @@ mod upload;
 pub use checkpoint::{ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
 pub use manager::TransferManager;
-pub use model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal};
+pub use model::{
+    TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal,
+    normalize_interruption,
+};
 pub use split_upload::{
     SplitTransferRuntime, SplitUploadRequest, resume_split_upload, upload_split,
     validate_split_part_bytes,

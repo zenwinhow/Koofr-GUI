@@ -9,7 +9,8 @@
 - `src/commands.rs`：暴露给 WebView 的 Tauri 命令，接口范围控制得很窄。
 - `src/crypto/`、`src/vault_core/`：还是空的，Vault 没动。
 - `src/credential_manager.rs`：用户选了保存密码的话，把应用专用密码写到 Windows 凭据管理器里。密码不会出现在普通配置中。
-- `src/settings.rs`、`src/metadata_cache.rs`：保存非敏感设置，为挂载点、目录、最近文件、共享和回收站提供按账户隔离的 TTL 缓存。
+- `src/settings.rs`、`src/metadata_cache.rs`：保存非敏感设置，为挂载点、目录、最近文件、共享和回收站提供按账户隔离、位置可配置的 TTL 缓存。
+- `src/logging.rs`：后台写入结构化 JSONL 诊断日志，支持级别过滤、大小轮转、保留期限、运行时切换目录和清理。
 
 ## 会话和安全边界
 
@@ -21,15 +22,16 @@
 - 上传路径只能由 Rust 打开的原生文件对话框授权。下载父目录用户可以手填，也可以用原生文件夹选择器选。Rust 会验证它是现有的绝对目录而且不是符号链接，只在这个目录下用清理后的远端名称创建新目标，签发一次性、区分文件/文件夹的授权 ID。前端不能指定最终文件名，也不能覆盖已有内容。上传也拒绝符号链接。
 - 下载不覆盖现有文件。单文件先写入由传输 ID 确定的 `.koofr-part-*` 临时文件。不含凭据的恢复元数据保存到当前 Windows 用户的应用数据目录，用 Koofr 用户 ID 隔离账户（兼容服务缺失该字段时用邮箱指纹）。网络断了、退出或暂停后，Rust 会重新核对远端大小、修改时间和可用哈希，然后发 `Range` 请求从已落盘偏移继续。如果服务端忽略 Range，就安全截断分片从头下载。文件夹下载还是用临时目录，失败或取消时清理整个暂存树。Windows 非法名称做安全替换，同级清理后重名会稳定追加序号。
 - 发给前端的错误只包含稳定错误码和安全消息，不包含令牌、本地路径、远程路径或服务端响应正文。
+- 诊断日志同样不记录令牌、邮箱、文件名或路径；传输失败只记录 transfer ID、错误类别、HTTP 状态或 I/O 类别等脱敏字段。
 
 会话令牌只在内存里待着。用户勾了"保存密码"，应用专用密码由 Windows Credential Manager 保护，下次启动时由 Rust 后端读出来重新认证。OAuth、公版应用注册和令牌刷新等后续认证里程碑确认后再做。
 
-文件元数据缓存默认只存在内存里。用户可以在设置里开磁盘缓存——缓存里只有普通 Koofr 文件名和远程路径，存在当前 Windows 用户的应用数据目录里，不包含密码、令牌或文件内容。切换到"不缓存"、清缓存或者换账户，缓存条目自动删掉。
+文件元数据缓存默认只存在内存里。用户可以在设置里开磁盘缓存并指定位置——缓存里只有普通 Koofr 文件名和远程路径，不包含密码、令牌或文件内容。切换到"不缓存"、清缓存或者换账户，缓存条目自动删掉。
 
 ## Tauri 命令
 
 `connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
-`get_settings`、`update_settings`、`update_download_settings`、`clear_metadata_cache`、`forget_saved_login`、`select_upload_file`、
+`get_settings`、`update_settings`、`update_download_settings`、`update_logging_settings`、`clear_metadata_cache`、`clear_logs`、`select_settings_directory`、`forget_saved_login`、`select_upload_file`、
 `select_download_location`、`select_download_folder`、`select_download_directory`、
 `prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、

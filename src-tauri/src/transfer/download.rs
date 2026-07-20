@@ -17,7 +17,10 @@ use crate::{
 use super::{
     checkpoint::{DownloadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     manager::TransferManager,
-    model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal},
+    model::{
+        TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal,
+        normalize_interruption,
+    },
     part::{open_partial, partial_length, truncate_partial, validate_checkpoint_paths},
     range::{ResponseMode, response_mode},
 };
@@ -89,9 +92,7 @@ async fn run_download(
             checkpoints.remove(&transfer_id).await?;
             Ok(result)
         }
-        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
-        Err(AppError::Cancelled) => Err(AppError::Cancelled),
-        Err(_) => Err(AppError::TransferPaused),
+        other => normalize_interruption(other, paused),
     };
     emit_terminal(
         &app,

@@ -19,7 +19,10 @@ use crate::{
 use super::{
     checkpoint::{TransferCheckpoint, TransferCheckpointStore, UploadCheckpoint},
     manager::TransferManager,
-    model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal},
+    model::{
+        TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal,
+        normalize_interruption,
+    },
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -120,9 +123,7 @@ async fn run_upload(
             checkpoints.remove(&transfer_id).await?;
             Ok(result)
         }
-        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
-        Err(AppError::Cancelled) => Err(AppError::Cancelled),
-        Err(_) => Err(AppError::TransferPaused),
+        other => normalize_interruption(other, paused),
     };
     emit_terminal(
         &app,

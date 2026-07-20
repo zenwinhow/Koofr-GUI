@@ -1,6 +1,17 @@
-import { Ban, Database, Download, FolderOpen, HardDrive, KeyRound, MemoryStick, ShieldCheck, Trash2 } from 'lucide-react'
+import {
+  Ban,
+  Bug,
+  Database,
+  Download,
+  FolderOpen,
+  HardDrive,
+  KeyRound,
+  MemoryStick,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { AppSettings, CacheMode } from '../../types/backend'
+import type { AppSettings, CacheMode, LogLevel } from '../../types/backend'
 import { formatBytes } from '../files/filePresentation'
 
 interface SettingsPanelProps {
@@ -11,9 +22,18 @@ interface SettingsPanelProps {
   readonly downloadError: string
   readonly onCacheModeChange: (mode: CacheMode) => void
   readonly onCacheTtlChange: (minutes: number) => void
+  readonly onCacheDirectoryChange: (directory: string) => void
+  readonly onLoggingSettingsChange: (settings: {
+    logDirectory: string
+    logLevel: LogLevel
+    logRetentionDays: number
+    logMaxFileSizeMb: number
+  }) => void
   readonly onDownloadSettingsChange: (directory: string, askDownloadLocation: boolean) => void
   readonly onBrowseDownloadDirectory: () => Promise<string | null>
+  readonly onBrowseSettingsDirectory: (kind: 'cache' | 'logs') => Promise<string | null>
   readonly onClearCache: () => void
+  readonly onClearLogs: () => void
   readonly onForgetLogin: () => void
 }
 
@@ -51,16 +71,31 @@ export function SettingsPanel({
   downloadError,
   onCacheModeChange,
   onCacheTtlChange,
+  onCacheDirectoryChange,
+  onLoggingSettingsChange,
   onDownloadSettingsChange,
   onBrowseDownloadDirectory,
+  onBrowseSettingsDirectory,
   onClearCache,
+  onClearLogs,
   onForgetLogin,
 }: SettingsPanelProps) {
   const [downloadDirectory, setDownloadDirectory] = useState(settings?.downloadDirectory ?? '')
-  const [browsing, setBrowsing] = useState(false)
+  const [cacheDirectory, setCacheDirectory] = useState(settings?.cacheDirectory ?? '')
+  const [logDirectory, setLogDirectory] = useState(settings?.logDirectory ?? '')
+  const [logLevel, setLogLevel] = useState<LogLevel>(settings?.logLevel ?? 'info')
+  const [logRetentionDays, setLogRetentionDays] = useState(settings?.logRetentionDays ?? 14)
+  const [logMaxFileSizeMb, setLogMaxFileSizeMb] = useState(settings?.logMaxFileSizeMb ?? 10)
+  const [browsing, setBrowsing] = useState<'download' | 'cache' | 'logs' | null>(null)
 
   useEffect(() => {
-    if (settings) setDownloadDirectory(settings.downloadDirectory)
+    if (!settings) return
+    setDownloadDirectory(settings.downloadDirectory)
+    setCacheDirectory(settings.cacheDirectory)
+    setLogDirectory(settings.logDirectory)
+    setLogLevel(settings.logLevel)
+    setLogRetentionDays(settings.logRetentionDays)
+    setLogMaxFileSizeMb(settings.logMaxFileSizeMb)
   }, [settings])
 
   if (loading || !settings) {
@@ -68,9 +103,16 @@ export function SettingsPanel({
   }
 
   const normalizedDownloadDirectory = downloadDirectory.trim()
+  const normalizedCacheDirectory = cacheDirectory.trim()
+  const normalizedLogDirectory = logDirectory.trim()
   const downloadDirectoryChanged = normalizedDownloadDirectory !== settings.downloadDirectory
+  const cacheDirectoryChanged = normalizedCacheDirectory !== settings.cacheDirectory
+  const loggingChanged = normalizedLogDirectory !== settings.logDirectory
+    || logLevel !== settings.logLevel
+    || logRetentionDays !== settings.logRetentionDays
+    || logMaxFileSizeMb !== settings.logMaxFileSizeMb
   const browseDownloadDirectory = async () => {
-    setBrowsing(true)
+    setBrowsing('download')
     try {
       const selected = await onBrowseDownloadDirectory()
       if (selected) {
@@ -78,7 +120,19 @@ export function SettingsPanel({
         onDownloadSettingsChange(selected, settings.askDownloadLocation)
       }
     } finally {
-      setBrowsing(false)
+      setBrowsing(null)
+    }
+  }
+  const browseStorageDirectory = async (kind: 'cache' | 'logs') => {
+    setBrowsing(kind)
+    try {
+      const selected = await onBrowseSettingsDirectory(kind)
+      if (selected) {
+        if (kind === 'cache') setCacheDirectory(selected)
+        else setLogDirectory(selected)
+      }
+    } finally {
+      setBrowsing(null)
     }
   }
 
@@ -113,7 +167,7 @@ export function SettingsPanel({
               type="button"
               aria-label="选择默认下载文件夹"
               title="选择文件夹"
-              disabled={busy || browsing}
+              disabled={busy || browsing !== null}
               onClick={() => void browseDownloadDirectory()}
             >
               <FolderOpen aria-hidden="true" />
@@ -124,6 +178,7 @@ export function SettingsPanel({
           <small id="settings-download-hint">可直接填写完整路径，也可以使用右侧按钮选择。</small>
           <button
             type="button"
+            aria-label="保存下载路径"
             disabled={busy || !downloadDirectoryChanged || !normalizedDownloadDirectory}
             onClick={() => onDownloadSettingsChange(
               normalizedDownloadDirectory,
@@ -214,11 +269,152 @@ export function SettingsPanel({
           </select>
         </div>
 
+        <div className="settings-path-field settings-path-field--spaced">
+          <label htmlFor="settings-cache-directory">缓存文件夹</label>
+          <span className="path-field__control">
+            <input
+              id="settings-cache-directory"
+              value={cacheDirectory}
+              disabled={busy}
+              onChange={(event) => setCacheDirectory(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && normalizedCacheDirectory) {
+                  onCacheDirectoryChange(normalizedCacheDirectory)
+                }
+              }}
+            />
+            <button
+              type="button"
+              aria-label="选择缓存文件夹"
+              title="选择文件夹"
+              disabled={busy || browsing !== null}
+              onClick={() => void browseStorageDirectory('cache')}
+            >
+              <FolderOpen aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+        <div className="settings-path-actions">
+          <small>仅磁盘模式会写入这里；切换位置时会安全迁移当前缓存。</small>
+          <button
+            type="button"
+            aria-label="保存缓存路径"
+            disabled={busy || !cacheDirectoryChanged || !normalizedCacheDirectory}
+            onClick={() => onCacheDirectoryChange(normalizedCacheDirectory)}
+          >
+            保存路径
+          </button>
+        </div>
+
         <div className="settings-storage">
           <span>当前缓存 {settings.cachedItems} 项</span>
           <span>磁盘占用 {formatBytes(settings.cacheDiskBytes)}</span>
           <button type="button" disabled={busy || settings.cachedItems === 0} onClick={onClearCache}>
             <Trash2 aria-hidden="true" />清除缓存
+          </button>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <header className="settings-section__heading">
+          <Bug aria-hidden="true" />
+          <div>
+            <h3>诊断日志</h3>
+            <p>用于定位上传、下载和网络错误；不会记录令牌、邮箱、文件名或完整路径。</p>
+          </div>
+        </header>
+
+        <div className="settings-path-field">
+          <label htmlFor="settings-log-directory">日志文件夹</label>
+          <span className="path-field__control">
+            <input
+              id="settings-log-directory"
+              value={logDirectory}
+              disabled={busy}
+              onChange={(event) => setLogDirectory(event.target.value)}
+            />
+            <button
+              type="button"
+              aria-label="选择日志文件夹"
+              title="选择文件夹"
+              disabled={busy || browsing !== null}
+              onClick={() => void browseStorageDirectory('logs')}
+            >
+              <FolderOpen aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+
+        <div className="settings-row settings-row--compact-grid">
+          <label htmlFor="settings-log-level">
+            <strong>记录级别</strong>
+            <small>排查问题时可临时切换到“调试”</small>
+          </label>
+          <select
+            id="settings-log-level"
+            aria-label="记录级别"
+            value={logLevel}
+            disabled={busy}
+            onChange={(event) => setLogLevel(event.target.value as LogLevel)}
+          >
+            <option value="error">仅错误</option>
+            <option value="warn">警告及错误</option>
+            <option value="info">常规信息</option>
+            <option value="debug">调试信息</option>
+          </select>
+          <label htmlFor="settings-log-retention">
+            <strong>保留时间</strong>
+            <small>轮转日志超过此时间会自动删除</small>
+          </label>
+          <select
+            id="settings-log-retention"
+            aria-label="保留时间"
+            value={logRetentionDays}
+            disabled={busy}
+            onChange={(event) => setLogRetentionDays(Number(event.target.value))}
+          >
+            <option value={3}>3 天</option>
+            <option value={7}>7 天</option>
+            <option value={14}>14 天</option>
+            <option value={30}>30 天</option>
+            <option value={90}>90 天</option>
+          </select>
+          <label htmlFor="settings-log-size">
+            <strong>单文件上限</strong>
+            <small>达到上限后创建新的日志文件</small>
+          </label>
+          <select
+            id="settings-log-size"
+            aria-label="单文件上限"
+            value={logMaxFileSizeMb}
+            disabled={busy}
+            onChange={(event) => setLogMaxFileSizeMb(Number(event.target.value))}
+          >
+            <option value={1}>1 MB</option>
+            <option value={5}>5 MB</option>
+            <option value={10}>10 MB</option>
+            <option value={25}>25 MB</option>
+            <option value={50}>50 MB</option>
+          </select>
+        </div>
+
+        <div className="settings-storage">
+          <span>{settings.logFiles} 个日志文件</span>
+          <span>磁盘占用 {formatBytes(settings.logDiskBytes)}</span>
+          <button
+            type="button"
+            disabled={busy || !loggingChanged || !normalizedLogDirectory}
+            onClick={() => onLoggingSettingsChange({
+              logDirectory: normalizedLogDirectory,
+              logLevel,
+              logRetentionDays,
+              logMaxFileSizeMb,
+            })}
+          >
+            保存日志设置
+          </button>
+          <button type="button" disabled={busy || settings.logFiles === 0} onClick={onClearLogs}>
+            <Trash2 aria-hidden="true" />清除日志
           </button>
         </div>
       </section>

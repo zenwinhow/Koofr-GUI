@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   AppSettings,
   CacheMode,
+  LogLevel,
   KoofrMount,
   KoofrSession,
   LocatedFile,
@@ -74,8 +75,26 @@ export const koofr = {
     return invoke<AppSettings>('get_settings')
   },
 
-  updateSettings(cacheMode: CacheMode, cacheTtlMinutes: number) {
-    return invoke<AppSettings>('update_settings', { cacheMode, cacheTtlMinutes })
+  updateSettings(cacheMode: CacheMode, cacheTtlMinutes: number, cacheDirectory: string) {
+    return invoke<AppSettings>('update_settings', {
+      cacheMode,
+      cacheTtlMinutes,
+      cacheDirectory,
+    })
+  },
+
+  updateLoggingSettings(
+    logDirectory: string,
+    logLevel: LogLevel,
+    logRetentionDays: number,
+    logMaxFileSizeMb: number,
+  ) {
+    return invoke<AppSettings>('update_logging_settings', {
+      logDirectory,
+      logLevel,
+      logRetentionDays,
+      logMaxFileSizeMb,
+    })
   },
 
   updateDownloadSettings(downloadDirectory: string, askDownloadLocation: boolean) {
@@ -87,6 +106,10 @@ export const koofr = {
 
   clearMetadataCache() {
     return invoke<AppSettings>('clear_metadata_cache')
+  },
+
+  clearLogs() {
+    return invoke<AppSettings>('clear_logs')
   },
 
   forgetSavedLogin() {
@@ -141,6 +164,10 @@ export const koofr = {
 
   selectDownloadDirectory() {
     return invoke<string | null>('select_download_directory')
+  },
+
+  selectSettingsDirectory(directoryKind: 'cache' | 'logs') {
+    return invoke<string | null>('select_settings_directory', { directoryKind })
   },
 
   prepareDownloadLocation(suggestedName: string, downloadDirectory: string) {

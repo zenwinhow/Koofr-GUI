@@ -12,6 +12,7 @@ use super::{
     checkpoint::{SplitUploadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     emit_progress, emit_terminal,
     manager::TransferManager,
+    normalize_interruption,
     split_package::{
         SplitManifest, SplitPart, package_directory_name, part_file_name, validate_part_bytes,
     },
@@ -130,9 +131,7 @@ async fn run(
         Err(AppError::InvalidInput(reason)) => Err(AppError::InvalidInput(reason)),
         Err(AppError::Conflict) => Err(AppError::Conflict),
         Err(AppError::Forbidden) => Err(AppError::Forbidden),
-        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
-        Err(AppError::Cancelled) => Err(AppError::Cancelled),
-        Err(_) => Err(AppError::TransferPaused),
+        other => normalize_interruption(other, paused),
     };
     emit_terminal(
         &runtime.app,
