@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞 / Security vulnerability
+    url: https://github.com/zenwinhow/Koofr-GUI/security/advisories/new
+    about: 不要开公开 Issue —— 请走 Security Advisory 私密渠道。Do NOT open a public issue — use the private Security Advisory channel.
+  - name: 使用问题 / Usage questions
+    url: https://github.com/zenwinhow/Koofr-GUI/discussions
+    about: 一般使用问题请去 Discussions（如已开启）。General usage questions go to Discussions if enabled.

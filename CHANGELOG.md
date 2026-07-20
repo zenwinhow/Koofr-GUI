@@ -2,6 +2,18 @@
 
 格式按 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号按 [SemVer](https://semver.org/spec/v2.0.0.html)。
 
+## [Unreleased]
+
+### Added
+- 顶层 `LICENSE`（MIT）、`CONTRIBUTING.md`、`SECURITY.md`
+- `docs/ARCHITECTURE.md`：完整架构、数据流、传输恢复、安全边界
+- `.github/ISSUE_TEMPLATE/`（bug / feature）与 `.github/PULL_REQUEST_TEMPLATE.md`
+- 英文 README（`README.en.md`）
+
+### Changed
+- 重写 `README.md`，按开源项目通用结构组织
+- 精修 `docs/BUILDING.md` 与 `docs/RELEASING.md` 的措辞、目录与常见问题
+
 ## [1.3.3] - 2026-07-20
 
 ### Changes
