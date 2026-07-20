@@ -17,8 +17,8 @@ use crate::{
     file_ops::{MountId, RemoteName, RemotePath, safe_suggested_file_name},
     koofr_api::KoofrApi,
     transfer::{
-        TransferDirection, TransferManager, TransferResult, TransferState, emit_progress,
-        emit_terminal,
+        NetworkRetryPolicy, TransferDirection, TransferManager, TransferResult, TransferState,
+        emit_progress, emit_terminal, should_retry_network, wait_for_network_retry,
     },
 };
 
@@ -96,6 +96,7 @@ pub struct FolderDownloadContext<'a> {
     pub app: AppHandle,
     pub api: &'a KoofrApi,
     pub manager: &'a TransferManager,
+    pub retry_policy: NetworkRetryPolicy,
 }
 
 pub async fn download_folder(
@@ -124,9 +125,30 @@ pub async fn download_folder(
             );
         },
     };
-    let result = executor
-        .run(request.remote_path, &request.transfer_id)
-        .await;
+    let mut retries_completed = 0_u32;
+    let result = loop {
+        let result = executor
+            .run(request.remote_path.clone(), &request.transfer_id)
+            .await;
+        if !should_retry_network(&result, context.retry_policy, retries_completed) {
+            break result;
+        }
+        retries_completed = retries_completed.saturating_add(1);
+        if let Err(error) = wait_for_network_retry(
+            &context.app,
+            &cancel,
+            &request.transfer_id,
+            TransferDirection::Download,
+            retries_completed,
+            progress.load(Ordering::Relaxed),
+            None,
+            context.retry_policy,
+        )
+        .await
+        {
+            break Err(error);
+        }
+    };
     let paused = context.manager.was_paused(&request.transfer_id);
     context.manager.finish(&request.transfer_id);
     let result = match result {

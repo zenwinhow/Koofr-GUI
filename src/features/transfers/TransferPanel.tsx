@@ -28,6 +28,7 @@ interface TransferPanelProps {
 
 const stateLabels = {
   running: '正在传输',
+  retrying: '等待网络重试',
   paused: '已暂停',
   completed: '已完成',
   cancelled: '已取消',
@@ -52,8 +53,14 @@ export function TransferPanel({
   onOpenFolder,
   onClearFinished,
 }: TransferPanelProps) {
-  const runningCount = items.filter((item) => item.state === 'running').length
-  const finishedCount = items.filter((item) => item.state !== 'running' && item.state !== 'paused').length
+  const runningCount = items.filter((item) => (
+    item.state === 'running' || item.state === 'retrying'
+  )).length
+  const finishedCount = items.filter((item) => (
+    item.state === 'completed'
+    || item.state === 'cancelled'
+    || (item.state === 'failed' && item.recoveryKind === null)
+  )).length
 
   return (
     <aside className={`transfer-panel${visible ? '' : ' transfer-panel--hidden'}`} aria-label="传输队列">
@@ -84,7 +91,7 @@ export function TransferPanel({
                   <span className="transfer-item__percent">{Math.round(percent)}%</span>
                 </div>
                 <div className="progress-track"><span style={{ width: `${percent}%` }} /></div>
-                {item.state === 'paused' && recovery ? (
+                {(item.state === 'paused' || item.state === 'failed') && recovery ? (
                   <div className="transfer-item__actions">
                     <button
                       type="button"
@@ -111,7 +118,7 @@ export function TransferPanel({
                   </div>
                 ) : null}
               </div>
-              {item.state === 'running' ? (
+              {item.state === 'running' || item.state === 'retrying' ? (
                 <>
                   <button className="row-action" type="button" aria-label={`暂停 ${item.name}`} title="暂停" onClick={() => onPause(item.id)}>
                     <Pause size={16} />

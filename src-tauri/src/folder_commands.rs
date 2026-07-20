@@ -7,7 +7,7 @@ use crate::{
     file_ops::{MountId, RemoteName, RemotePath},
     folder_download::{self, FolderDownloadContext, FolderDownloadRequest, FolderDownloadTarget},
     local_access::LocalFileSelection,
-    transfer::TransferResult,
+    transfer::{NetworkRetryPolicy, TransferResult},
 };
 
 type CommandResult<T> = Result<T, CommandError>;
@@ -75,6 +75,7 @@ pub async fn download_folder(
             app,
             api: &state.api,
             manager: &state.transfers,
+            retry_policy: NetworkRetryPolicy::from(state.settings.network_retry_settings().await),
         },
         FolderDownloadRequest {
             transfer_id: transfer_id.clone(),

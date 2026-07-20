@@ -13,7 +13,8 @@ use crate::{
     koofr_api::{FileInfo, LocatedFile, Mount, SessionInfo, TrashList},
     local_access::LocalFileSelection,
     local_open,
-    settings::CacheMode,
+    logging::LogConfig,
+    settings::{CacheMode, LogLevel},
     transfer::{self, TransferResult},
 };
 
@@ -43,6 +44,16 @@ pub struct SettingsSnapshot {
     saved_email: Option<String>,
     download_directory: String,
     ask_download_location: bool,
+    cache_directory: String,
+    log_directory: String,
+    log_level: LogLevel,
+    log_retention_days: u32,
+    log_max_file_size_mb: u32,
+    log_files: usize,
+    log_disk_bytes: u64,
+    auto_retry_network_errors: bool,
+    network_retry_limit: Option<u32>,
+    network_retry_interval_seconds: u32,
 }
 
 #[tauri::command]
@@ -246,6 +257,42 @@ pub async fn select_download_directory(
 }
 
 #[tauri::command]
+pub async fn select_settings_directory(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    directory_kind: String,
+) -> CommandResult<Option<String>> {
+    let initial_directory = match directory_kind.as_str() {
+        "cache" => state.settings.cache_directory().await,
+        "logs" => state.settings.log_policy().await.0,
+        _ => return Err(CommandError::from(AppError::InvalidInput("directory kind"))),
+    };
+    let Some(directory) = app
+        .dialog()
+        .file()
+        .set_directory(initial_directory)
+        .blocking_pick_folder()
+    else {
+        return Ok(None);
+    };
+    let path = directory
+        .into_path()
+        .map_err(|_| CommandError::from(AppError::Dialog))?;
+    let metadata = tokio::fs::symlink_metadata(&path)
+        .await
+        .map_err(|error| CommandError::from(AppError::from(error)))?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err(CommandError::from(AppError::InvalidInput(
+            "settings directory",
+        )));
+    }
+    path.to_str()
+        .map(str::to_owned)
+        .map(Some)
+        .ok_or_else(|| CommandError::from(AppError::InvalidInput("settings directory")))
+}
+
+#[tauri::command]
 pub async fn prepare_download_location(
     state: State<'_, AppState>,
     suggested_name: String,
@@ -269,7 +316,12 @@ pub async fn koofr_session(state: State<'_, AppState>) -> CommandResult<SessionI
 async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
     let (cache_mode, cache_ttl_minutes) = state.settings.cache_policy().await;
     let (download_directory, ask_download_location) = state.settings.download_policy().await;
+    let cache_directory = state.settings.cache_directory().await;
+    let (log_directory, log_level, log_retention_days, log_max_file_size_mb) =
+        state.settings.log_policy().await;
     let (cached_items, cache_disk_bytes) = state.cache.stats().await;
+    let (log_files, log_disk_bytes) = state.logger.stats().await;
+    let network_retry = state.settings.network_retry_settings().await;
     SettingsSnapshot {
         cache_mode,
         cache_ttl_minutes,
@@ -278,6 +330,16 @@ async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
         saved_email: state.settings.remembered_email().await,
         download_directory: download_directory.to_string_lossy().into_owned(),
         ask_download_location,
+        cache_directory: cache_directory.to_string_lossy().into_owned(),
+        log_directory: log_directory.to_string_lossy().into_owned(),
+        log_level,
+        log_retention_days,
+        log_max_file_size_mb,
+        log_files,
+        log_disk_bytes,
+        auto_retry_network_errors: network_retry.enabled,
+        network_retry_limit: network_retry.max_retries,
+        network_retry_interval_seconds: network_retry.interval_seconds,
     }
 }
 
@@ -291,17 +353,88 @@ pub async fn update_settings(
     state: State<'_, AppState>,
     cache_mode: CacheMode,
     cache_ttl_minutes: u32,
+    cache_directory: String,
 ) -> CommandResult<SettingsSnapshot> {
+    let cache_directory = PathBuf::from(cache_directory.trim());
     state
         .settings
-        .update_cache(cache_mode, cache_ttl_minutes)
+        .update_cache(cache_mode, cache_ttl_minutes, cache_directory.clone())
         .await
         .map_err(CommandError::from)?;
     state
         .cache
-        .apply_mode(cache_mode)
+        .relocate(cache_directory.join("metadata-cache.json"), cache_mode)
         .await
         .map_err(CommandError::from)?;
+    state.logger.info(
+        "settings",
+        "cache_settings_updated",
+        None,
+        serde_json::Map::new(),
+    );
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn update_logging_settings(
+    state: State<'_, AppState>,
+    log_directory: String,
+    log_level: LogLevel,
+    log_retention_days: u32,
+    log_max_file_size_mb: u32,
+) -> CommandResult<SettingsSnapshot> {
+    let log_directory = PathBuf::from(log_directory.trim());
+    state
+        .settings
+        .update_logging(
+            log_directory.clone(),
+            log_level,
+            log_retention_days,
+            log_max_file_size_mb,
+        )
+        .await
+        .map_err(CommandError::from)?;
+    state
+        .logger
+        .configure(LogConfig {
+            directory: log_directory,
+            level: log_level,
+            retention_days: log_retention_days,
+            max_file_bytes: u64::from(log_max_file_size_mb) * 1024 * 1024,
+        })
+        .await
+        .map_err(CommandError::from)?;
+    state.logger.info(
+        "settings",
+        "logging_settings_updated",
+        None,
+        serde_json::Map::new(),
+    );
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn update_transfer_settings(
+    state: State<'_, AppState>,
+    auto_retry_network_errors: bool,
+    network_retry_limit: Option<u32>,
+    network_retry_interval_seconds: u32,
+) -> CommandResult<SettingsSnapshot> {
+    state
+        .settings
+        .update_transfer(
+            auto_retry_network_errors,
+            network_retry_limit,
+            network_retry_interval_seconds,
+        )
+        .await
+        .map_err(CommandError::from)?;
+    state.logger.info(
+        "settings",
+        "transfer_settings_updated",
+        None,
+        serde_json::Map::new(),
+    );
     Ok(settings_snapshot(&state).await)
 }
 
@@ -325,6 +458,12 @@ pub async fn update_download_settings(
 #[tauri::command]
 pub async fn clear_metadata_cache(state: State<'_, AppState>) -> CommandResult<SettingsSnapshot> {
     state.cache.clear().await.map_err(CommandError::from)?;
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn clear_logs(state: State<'_, AppState>) -> CommandResult<SettingsSnapshot> {
+    state.logger.clear().await.map_err(CommandError::from)?;
     Ok(settings_snapshot(&state).await)
 }
 
@@ -602,11 +741,14 @@ pub async fn upload_file(
     let local_path = LocalUploadPath::from_selected(selected_path)
         .await
         .map_err(CommandError::from)?;
+    let retry_policy =
+        transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await);
     let result = transfer::upload(
         app,
         &state.api,
         &state.transfers,
         &state.transfer_checkpoints,
+        retry_policy,
         transfer_id,
         mount_id,
         directory,
@@ -637,11 +779,14 @@ pub async fn download_file(
     let local_path = LocalDownloadPath::from_selected(selected_path)
         .await
         .map_err(CommandError::from)?;
+    let retry_policy =
+        transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await);
     let result = transfer::download(
         app,
         &state.api,
         &state.transfers,
         &state.transfer_checkpoints,
+        retry_policy,
         transfer_id.clone(),
         mount_id,
         remote_path,

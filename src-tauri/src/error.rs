@@ -2,6 +2,7 @@ use std::io;
 
 use reqwest::StatusCode;
 use serde::Serialize;
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -69,6 +70,83 @@ impl AppError {
             StatusCode::CONFLICT => Self::Conflict,
             _ => Self::RemoteStatus { status },
         }
+    }
+
+    pub const fn log_code(&self) -> &'static str {
+        match self {
+            Self::AuthenticationFailed => "authentication_failed",
+            Self::NotAuthenticated => "not_authenticated",
+            Self::AccountIdentityUnavailable => "account_identity_unavailable",
+            Self::InvalidInput(_) => "invalid_input",
+            Self::Conflict => "conflict",
+            Self::NotFound => "not_found",
+            Self::Forbidden => "forbidden",
+            Self::Cancelled => "cancelled",
+            Self::TransferPaused => "transfer_paused",
+            Self::IncompleteTransfer => "incomplete_transfer",
+            Self::DuplicateTransfer => "duplicate_transfer",
+            Self::RemoteStatus { .. } => "remote_error",
+            Self::Network(_) => "network_error",
+            Self::Io(_) => "local_io_error",
+            Self::Decode(_) => "invalid_response",
+            Self::Initialization => "initialization_error",
+            Self::Dialog => "dialog_error",
+            Self::LocalData => "local_data_error",
+            Self::CredentialStore => "credential_store_error",
+            Self::LocalOpen => "local_open_error",
+        }
+    }
+
+    pub fn safe_log_fields(&self) -> Map<String, Value> {
+        let mut fields = Map::new();
+        match self {
+            Self::RemoteStatus { status } => {
+                fields.insert("httpStatus".to_owned(), Value::from(status.as_u16()));
+            }
+            Self::Network(error) => {
+                fields.insert("isTimeout".to_owned(), Value::Bool(error.is_timeout()));
+                fields.insert("isConnect".to_owned(), Value::Bool(error.is_connect()));
+                fields.insert("isRequest".to_owned(), Value::Bool(error.is_request()));
+                fields.insert("isBody".to_owned(), Value::Bool(error.is_body()));
+            }
+            Self::Io(error) => {
+                fields.insert(
+                    "ioKind".to_owned(),
+                    Value::String(io_kind_code(error.kind()).to_owned()),
+                );
+                if let Some(code) = error.raw_os_error() {
+                    fields.insert("osErrorCode".to_owned(), Value::from(code));
+                }
+            }
+            Self::Decode(error) => {
+                fields.insert(
+                    "jsonCategory".to_owned(),
+                    Value::String(format!("{:?}", error.classify()).to_ascii_lowercase()),
+                );
+                fields.insert("jsonLine".to_owned(), Value::from(error.line() as u64));
+                fields.insert("jsonColumn".to_owned(), Value::from(error.column() as u64));
+            }
+            _ => {}
+        }
+        fields
+    }
+}
+
+fn io_kind_code(kind: std::io::ErrorKind) -> &'static str {
+    match kind {
+        std::io::ErrorKind::NotFound => "not_found",
+        std::io::ErrorKind::PermissionDenied => "permission_denied",
+        std::io::ErrorKind::AlreadyExists => "already_exists",
+        std::io::ErrorKind::InvalidInput => "invalid_input",
+        std::io::ErrorKind::InvalidData => "invalid_data",
+        std::io::ErrorKind::TimedOut => "timed_out",
+        std::io::ErrorKind::WriteZero => "write_zero",
+        std::io::ErrorKind::UnexpectedEof => "unexpected_eof",
+        std::io::ErrorKind::OutOfMemory => "out_of_memory",
+        std::io::ErrorKind::StorageFull => "storage_full",
+        std::io::ErrorKind::FileTooLarge => "file_too_large",
+        std::io::ErrorKind::ReadOnlyFilesystem => "read_only_filesystem",
+        _ => "other",
     }
 }
 

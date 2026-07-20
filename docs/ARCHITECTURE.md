@@ -256,6 +256,17 @@ src-tauri/src/
 
 文件夹下载**不做**磁盘 checkpoint（重启后无法续传整个文件夹），因为 Koofr 目录清单可能已变；重新开始比"部分恢复导致混淆"更安全。已下载单个文件的字节 checkpoint 仍然保留。
 
+### 网络错误自动恢复
+
+设置中的 `autoRetryNetworkErrors` 只匹配 `AppError::Network`（前端错误码 `network_error`）。`networkRetryLimit` 表示初次请求失败后的最大重试次数，`null` 表示无限；`networkRetryIntervalSeconds` 是每次重试前使用的固定等待时间。等待期间会发出 `Retrying` 状态，暂停和取消仍由同一个 `CancellationToken` 控制。
+
+- 单文件下载重新读取临时文件长度并使用 HTTP Range 从已落盘偏移继续。
+- 分卷上传重新核对远端完整分卷，从最后一个已确认分卷继续。
+- 普通上传受 Koofr 整文件 `FilesPut` 接口限制，每次重试必须从文件开头重新发送。
+- 文件夹下载会清理本次失败的暂存树后，从头重建目录下载。
+- 权限、冲突、本地 I/O、HTTP 状态和内容完整性错误不会触发该策略。
+- 每次调度重试都会写入脱敏日志事件 `network_retry_scheduled`，仅包含传输 ID、方向、次数和延迟。
+
 ### 元数据缓存
 
 `MetadataCache` 三种模式：
@@ -263,12 +274,22 @@ src-tauri/src/
 | 模式 | 存储位置 | TTL |
 | --- | --- | --- |
 | `Off` | 无缓存，每次都请求 Koofr | - |
-| `Memory` | 进程内存 `RwLock<HashMap>` | 可配置（默认 5 分钟）|
-| `Disk` | `%LOCALAPPDATA%\net.koofr.desktop.gui\metadata-cache\` | 可配置 |
+| `Memory` | 进程内存 `RwLock<HashMap>` | 可配置（默认 15 分钟）|
+| `Disk` | 用户在设置中指定的缓存文件夹 | 可配置 |
 
 - 缓存 key = `(userId, mountId, remotePath)`，按账户完全隔离。
 - 缓存 value = **仅**文件名 + 远程路径 + 大小 + 修改时间。**不缓存令牌、密码、文件内容**。
 - 切换模式、清缓存、切换账户时自动失效。
+- 缓存文件夹可在设置中更改；后端只接受已有的绝对目录并拒绝符号链接，切换时迁移缓存文件。
+
+### 诊断日志
+
+`AppLogger` 使用独立后台线程写入 JSONL，不阻塞 Tauri 命令或传输任务。设置页可以指定日志文件夹、记录级别、保留天数和单文件大小上限，也可以查看占用并一键清理。
+
+- 活动文件为 `koofr-gui.jsonl`，达到大小上限后使用带时间戳和随机 ID 的文件名轮转。
+- 轮转文件按保留天数自动清理；默认保留 14 天，单文件上限 10 MB。
+- 传输日志记录 session ID、transfer ID、方向、终态、字节数、稳定错误码，以及脱敏后的 HTTP 状态 / I/O 类别 / 网络失败分类。
+- **绝不记录**认证头、令牌、密码、邮箱、文件名、完整本地路径、远程路径或服务端响应正文。
 
 ### 凭据存储
 
@@ -312,7 +333,7 @@ pub enum AppError {
 
 认证 / 会话：`connect_koofr`, `restore_saved_login`, `disconnect_koofr`, `koofr_session`, `forget_saved_login`
 
-设置：`get_settings`, `update_settings`, `update_download_settings`, `clear_metadata_cache`
+设置：`get_settings`, `update_settings`, `update_download_settings`, `update_logging_settings`, `update_transfer_settings`, `clear_metadata_cache`, `clear_logs`, `select_settings_directory`
 
 文件浏览：`list_mounts`, `list_files`, `list_recent`, `list_shared`, `list_trash`
 
@@ -332,9 +353,10 @@ pub enum AppError {
 
 ```
 %LOCALAPPDATA%\net.koofr.desktop.gui\
-├─ settings.json                # AppSettings（下载目录、缓存模式、主题等）
+├─ settings.json                # AppSettings（下载、缓存和日志策略等）
 ├─ transfer-checkpoints.json    # TransferCheckpointStore（可恢复任务）
-└─ metadata-cache/              # 磁盘缓存模式开启时的元数据文件
+├─ cache/metadata-cache.json    # 默认磁盘缓存位置（可配置）
+└─ logs/koofr-gui*.jsonl       # 默认诊断日志位置（可配置）
 ```
 
 **Windows 凭据管理器**（不在上面目录里）：

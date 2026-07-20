@@ -74,4 +74,97 @@ describe('TransferPanel', () => {
     // Then
     expect(onResume).toHaveBeenCalledWith('transfer-2')
   })
+
+  it('keeps retry available when an upload reports a real failure', async () => {
+    const user = userEvent.setup()
+    const onResume = vi.fn()
+    render(
+      <TransferPanel
+        visible
+        items={[{
+          id: 'transfer-3',
+          name: 'failed.zip',
+          direction: 'upload',
+          state: 'failed',
+          bytesTransferred: 32,
+          totalBytes: 128,
+          localKind: 'file',
+          recoveryKind: 'restart',
+        }]}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDiscard={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenFolder={vi.fn()}
+        onClearFinished={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('失败 · 32 B')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '重新上传 failed.zip' }))
+    expect(onResume).toHaveBeenCalledWith('transfer-3')
+  })
+
+  it('continues a failed split upload from its committed chunks', async () => {
+    const user = userEvent.setup()
+    const onResume = vi.fn()
+    render(
+      <TransferPanel
+        visible
+        items={[{
+          id: 'transfer-4',
+          name: 'split-package',
+          direction: 'upload',
+          state: 'failed',
+          bytesTransferred: 64,
+          totalBytes: 256,
+          localKind: 'file',
+          recoveryKind: 'chunk_resume',
+        }]}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onPause={vi.fn()}
+        onResume={onResume}
+        onDiscard={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenFolder={vi.fn()}
+        onClearFinished={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '继续上传 split-package' }))
+    expect(onResume).toHaveBeenCalledWith('transfer-4')
+  })
+
+  it('keeps pause and cancel available while waiting to retry', () => {
+    render(
+      <TransferPanel
+        visible
+        items={[{
+          id: 'transfer-5',
+          name: 'retrying.bin',
+          direction: 'download',
+          state: 'retrying',
+          bytesTransferred: 64,
+          totalBytes: 256,
+          localKind: 'file',
+          recoveryKind: 'byte_resume',
+        }]}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onDiscard={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenFolder={vi.fn()}
+        onClearFinished={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('等待网络重试 · 64 B')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '暂停 retrying.bin' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '取消 retrying.bin' })).toBeTruthy()
+  })
 })

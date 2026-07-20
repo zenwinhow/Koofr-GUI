@@ -33,6 +33,7 @@ export interface LoginBootstrap {
 }
 
 export type CacheMode = 'off' | 'memory' | 'disk'
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
 
 export interface AppSettings {
   readonly cacheMode: CacheMode
@@ -42,6 +43,16 @@ export interface AppSettings {
   readonly savedEmail: string | null
   readonly downloadDirectory: string
   readonly askDownloadLocation: boolean
+  readonly cacheDirectory: string
+  readonly logDirectory: string
+  readonly logLevel: LogLevel
+  readonly logRetentionDays: number
+  readonly logMaxFileSizeMb: number
+  readonly logFiles: number
+  readonly logDiskBytes: number
+  readonly autoRetryNetworkErrors: boolean
+  readonly networkRetryLimit: number | null
+  readonly networkRetryIntervalSeconds: number
 }
 
 export interface KoofrMount {
@@ -106,7 +117,7 @@ export interface TrashRestoreTarget {
 }
 
 export type TransferDirection = 'upload' | 'download'
-export type TransferState = 'running' | 'paused' | 'completed' | 'cancelled' | 'failed'
+export type TransferState = 'running' | 'retrying' | 'paused' | 'completed' | 'cancelled' | 'failed'
 export type RecoveryKind = 'byte_resume' | 'chunk_resume' | 'restart'
 
 export interface TransferProgress {

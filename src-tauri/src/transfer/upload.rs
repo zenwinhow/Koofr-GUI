@@ -19,7 +19,10 @@ use crate::{
 use super::{
     checkpoint::{TransferCheckpoint, TransferCheckpointStore, UploadCheckpoint},
     manager::TransferManager,
-    model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal},
+    model::{
+        NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
+        emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
+    },
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -28,6 +31,7 @@ pub async fn upload(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
     mount_id: MountId,
     directory: RemotePath,
@@ -51,6 +55,7 @@ pub async fn upload(
         api,
         manager,
         checkpoints,
+        retry_policy,
         transfer_id,
         mount_id,
         directory,
@@ -64,6 +69,7 @@ pub async fn retry_upload(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
 ) -> Result<TransferResult, AppError> {
     let TransferCheckpoint::Upload(checkpoint) = checkpoints.get(&transfer_id).await? else {
@@ -81,6 +87,7 @@ pub async fn retry_upload(
         api,
         manager,
         checkpoints,
+        retry_policy,
         transfer_id,
         MountId::parse(checkpoint.mount_id)?,
         RemotePath::parse(checkpoint.remote_directory)?,
@@ -95,24 +102,48 @@ async fn run_upload(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
     mount_id: MountId,
     directory: RemotePath,
     local_path: LocalUploadPath,
 ) -> Result<TransferResult, AppError> {
+    let total = tokio::fs::metadata(local_path.as_path()).await?.len();
     let cancel = manager.register(&transfer_id)?;
     let progress = Arc::new(AtomicU64::new(0));
-    let result = upload_inner(
-        &app,
-        api,
-        &transfer_id,
-        &cancel,
-        mount_id,
-        directory,
-        local_path,
-        progress.clone(),
-    )
-    .await;
+    let mut retries_completed = 0_u32;
+    let result = loop {
+        progress.store(0, Ordering::Relaxed);
+        let result = upload_inner(
+            &app,
+            api,
+            &transfer_id,
+            &cancel,
+            mount_id.clone(),
+            directory.clone(),
+            local_path.clone(),
+            progress.clone(),
+        )
+        .await;
+        if !should_retry_network(&result, retry_policy, retries_completed) {
+            break result;
+        }
+        retries_completed = retries_completed.saturating_add(1);
+        if let Err(error) = wait_for_network_retry(
+            &app,
+            &cancel,
+            &transfer_id,
+            TransferDirection::Upload,
+            retries_completed,
+            progress.load(Ordering::Relaxed),
+            Some(total),
+            retry_policy,
+        )
+        .await
+        {
+            break Err(error);
+        }
+    };
     let paused = manager.was_paused(&transfer_id);
     manager.finish(&transfer_id);
     let result = match result {
@@ -120,9 +151,7 @@ async fn run_upload(
             checkpoints.remove(&transfer_id).await?;
             Ok(result)
         }
-        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
-        Err(AppError::Cancelled) => Err(AppError::Cancelled),
-        Err(_) => Err(AppError::TransferPaused),
+        other => normalize_interruption(other, paused),
     };
     emit_terminal(
         &app,

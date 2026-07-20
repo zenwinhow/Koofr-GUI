@@ -8,16 +8,18 @@ use crate::{
 };
 
 use super::{
-    TransferDirection, TransferResult, TransferState,
+    NetworkRetryPolicy, TransferDirection, TransferResult, TransferState,
     checkpoint::{SplitUploadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     emit_progress, emit_terminal,
     manager::TransferManager,
+    normalize_interruption, should_retry_network,
     split_package::{
         SplitManifest, SplitPart, package_directory_name, part_file_name, validate_part_bytes,
     },
     split_part_io::{committed_bytes, hash_file, hash_file_range, upload_next_part},
     split_support::upload_support_files,
     upload::modified_millis,
+    wait_for_network_retry,
 };
 
 pub struct SplitTransferRuntime<'a> {
@@ -25,6 +27,7 @@ pub struct SplitTransferRuntime<'a> {
     pub api: &'a KoofrApi,
     pub manager: &'a TransferManager,
     pub checkpoints: &'a TransferCheckpointStore,
+    pub retry_policy: NetworkRetryPolicy,
 }
 
 pub struct SplitUploadRequest {
@@ -59,19 +62,6 @@ pub async fn upload_split(
     };
     let part_bytes = validate_part_bytes(request.part_bytes)?;
     let package_path = request.directory.join(&package_name)?;
-    match runtime
-        .api
-        .file_info(&request.mount_id, &package_path)
-        .await
-    {
-        Ok(_) => return Err(AppError::Conflict),
-        Err(AppError::NotFound) => {}
-        Err(error) => return Err(error),
-    }
-    runtime
-        .api
-        .create_folder(&request.mount_id, &request.directory, &package_name)
-        .await?;
     let checkpoint = SplitUploadCheckpoint {
         transfer_id: request.transfer_id,
         owner_id: runtime.api.recovery_scope().await?,
@@ -88,7 +78,37 @@ pub async fn upload_split(
         .checkpoints
         .insert(TransferCheckpoint::SplitUpload(checkpoint.clone()))
         .await?;
-    run(runtime, checkpoint).await
+    let cancel = runtime.manager.register(&checkpoint.transfer_id)?;
+    let preparation = prepare_new_package(
+        &runtime,
+        &cancel,
+        &request.mount_id,
+        &request.directory,
+        &package_name,
+        &package_path,
+        &checkpoint,
+    )
+    .await;
+    if let Err(error) = preparation {
+        let paused = runtime.manager.was_paused(&checkpoint.transfer_id);
+        runtime.manager.finish(&checkpoint.transfer_id);
+        let result = normalize_interruption(Err(error), paused);
+        if matches!(
+            &result,
+            Err(AppError::InvalidInput(_) | AppError::Conflict | AppError::Forbidden)
+        ) {
+            let _ = runtime.checkpoints.remove(&checkpoint.transfer_id).await;
+        }
+        emit_terminal(
+            &runtime.app,
+            &checkpoint.transfer_id,
+            TransferDirection::Upload,
+            0,
+            &result,
+        );
+        return result;
+    }
+    run_registered(runtime, checkpoint, cancel).await
 }
 
 pub async fn resume_split_upload(
@@ -111,10 +131,39 @@ pub async fn resume_split_upload(
 
 async fn run(
     runtime: SplitTransferRuntime<'_>,
-    mut checkpoint: SplitUploadCheckpoint,
+    checkpoint: SplitUploadCheckpoint,
 ) -> Result<TransferResult, AppError> {
     let cancel = runtime.manager.register(&checkpoint.transfer_id)?;
-    let result = run_inner(&runtime, &cancel, &mut checkpoint).await;
+    run_registered(runtime, checkpoint, cancel).await
+}
+
+async fn run_registered(
+    runtime: SplitTransferRuntime<'_>,
+    mut checkpoint: SplitUploadCheckpoint,
+    cancel: CancellationToken,
+) -> Result<TransferResult, AppError> {
+    let mut retries_completed = 0_u32;
+    let result = loop {
+        let result = run_inner(&runtime, &cancel, &mut checkpoint).await;
+        if !should_retry_network(&result, runtime.retry_policy, retries_completed) {
+            break result;
+        }
+        retries_completed = retries_completed.saturating_add(1);
+        if let Err(error) = wait_for_network_retry(
+            &runtime.app,
+            &cancel,
+            &checkpoint.transfer_id,
+            TransferDirection::Upload,
+            retries_completed,
+            committed_bytes(&checkpoint),
+            Some(checkpoint.expected_size),
+            runtime.retry_policy,
+        )
+        .await
+        {
+            break Err(error);
+        }
+    };
     let paused = runtime.manager.was_paused(&checkpoint.transfer_id);
     runtime.manager.finish(&checkpoint.transfer_id);
     let committed = checkpoint
@@ -130,9 +179,7 @@ async fn run(
         Err(AppError::InvalidInput(reason)) => Err(AppError::InvalidInput(reason)),
         Err(AppError::Conflict) => Err(AppError::Conflict),
         Err(AppError::Forbidden) => Err(AppError::Forbidden),
-        Err(AppError::Cancelled) if paused => Err(AppError::TransferPaused),
-        Err(AppError::Cancelled) => Err(AppError::Cancelled),
-        Err(_) => Err(AppError::TransferPaused),
+        other => normalize_interruption(other, paused),
     };
     emit_terminal(
         &runtime.app,
@@ -142,6 +189,64 @@ async fn run(
         &result,
     );
     result
+}
+
+async fn prepare_new_package(
+    runtime: &SplitTransferRuntime<'_>,
+    cancel: &CancellationToken,
+    mount_id: &MountId,
+    directory: &RemotePath,
+    package_name: &RemoteName,
+    package_path: &RemotePath,
+    checkpoint: &SplitUploadCheckpoint,
+) -> Result<(), AppError> {
+    let mut retries_completed = 0_u32;
+    let mut creation_attempted = false;
+    loop {
+        let result = prepare_new_package_once(
+            runtime.api,
+            mount_id,
+            directory,
+            package_name,
+            package_path,
+            &mut creation_attempted,
+        )
+        .await;
+        if !should_retry_network(&result, runtime.retry_policy, retries_completed) {
+            return result;
+        }
+        retries_completed = retries_completed.saturating_add(1);
+        wait_for_network_retry(
+            &runtime.app,
+            cancel,
+            &checkpoint.transfer_id,
+            TransferDirection::Upload,
+            retries_completed,
+            0,
+            Some(checkpoint.expected_size),
+            runtime.retry_policy,
+        )
+        .await?;
+    }
+}
+
+async fn prepare_new_package_once(
+    api: &KoofrApi,
+    mount_id: &MountId,
+    directory: &RemotePath,
+    package_name: &RemoteName,
+    package_path: &RemotePath,
+    creation_attempted: &mut bool,
+) -> Result<(), AppError> {
+    match api.file_info(mount_id, package_path).await {
+        Ok(info) if *creation_attempted && info.entry_type == "dir" => Ok(()),
+        Ok(_) => Err(AppError::Conflict),
+        Err(AppError::NotFound) => {
+            *creation_attempted = true;
+            api.create_folder(mount_id, directory, package_name).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 async fn run_inner(

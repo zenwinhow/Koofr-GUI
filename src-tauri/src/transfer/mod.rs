@@ -17,7 +17,10 @@ mod upload;
 pub use checkpoint::{ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
 pub use manager::TransferManager;
-pub use model::{TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal};
+pub use model::{
+    NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
+    emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
+};
 pub use split_upload::{
     SplitTransferRuntime, SplitUploadRequest, resume_split_upload, upload_split,
     validate_split_part_bytes,
@@ -34,6 +37,7 @@ pub async fn resume_checkpoint(
     api: &crate::koofr_api::KoofrApi,
     manager: &TransferManager,
     store: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
 ) -> Result<ResumeOutcome, crate::error::AppError> {
     let owner_id = current_owner(api).await?;
@@ -44,7 +48,8 @@ pub async fn resume_checkpoint(
     match checkpoint {
         checkpoint::TransferCheckpoint::Download(checkpoint) => {
             let completed_path = checkpoint.local_path;
-            let result = resume_download(app, api, manager, store, transfer_id).await?;
+            let result =
+                resume_download(app, api, manager, store, retry_policy, transfer_id).await?;
             Ok(ResumeOutcome {
                 result,
                 completed_path: Some(completed_path),
@@ -57,6 +62,7 @@ pub async fn resume_checkpoint(
                     api,
                     manager,
                     checkpoints: store,
+                    retry_policy,
                 },
                 transfer_id,
             )
@@ -67,7 +73,7 @@ pub async fn resume_checkpoint(
             })
         }
         checkpoint::TransferCheckpoint::Upload(_) => {
-            let result = retry_upload(app, api, manager, store, transfer_id).await?;
+            let result = retry_upload(app, api, manager, store, retry_policy, transfer_id).await?;
             Ok(ResumeOutcome {
                 result,
                 completed_path: None,

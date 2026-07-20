@@ -41,20 +41,25 @@ impl Default for StoredCache {
 
 #[derive(Clone)]
 pub struct MetadataCache {
-    path: PathBuf,
+    path: Arc<RwLock<PathBuf>>,
     state: Arc<RwLock<StoredCache>>,
 }
 
 impl MetadataCache {
     pub fn load(path: PathBuf, load_disk: bool) -> Self {
         let state = load_disk
-            .then(|| std::fs::read(&path).ok())
+            .then(|| {
+                std::fs::symlink_metadata(&path)
+                    .ok()
+                    .filter(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
+                    .and_then(|_| std::fs::read(&path).ok())
+            })
             .flatten()
             .and_then(|bytes| serde_json::from_slice::<StoredCache>(&bytes).ok())
             .filter(|cache| cache.version == CACHE_VERSION)
             .unwrap_or_default();
         Self {
-            path,
+            path: Arc::new(RwLock::new(path)),
             state: Arc::new(RwLock::new(state)),
         }
     }
@@ -150,41 +155,75 @@ impl MetadataCache {
 
     pub async fn stats(&self) -> (usize, u64) {
         let entries = self.state.read().await.entries.len();
-        let bytes = tokio::fs::metadata(&self.path)
+        let path = self.path.read().await.clone();
+        let bytes = tokio::fs::metadata(path)
             .await
             .map(|metadata| metadata.len())
             .unwrap_or(0);
         (entries, bytes)
     }
 
-    async fn persist(&self) -> Result<(), AppError> {
-        let payload =
-            serde_json::to_vec(&*self.state.read().await).map_err(|_| AppError::LocalData)?;
-        let parent = self.path.parent().ok_or(AppError::LocalData)?;
-        tokio::fs::create_dir_all(parent)
-            .await
-            .map_err(|_| AppError::LocalData)?;
-        let temporary = self.path.with_extension("json.tmp");
-        tokio::fs::write(&temporary, payload)
-            .await
-            .map_err(|_| AppError::LocalData)?;
-        if tokio::fs::try_exists(&self.path).await.unwrap_or(false) {
-            tokio::fs::remove_file(&self.path)
+    pub async fn relocate(&self, path: PathBuf, mode: CacheMode) -> Result<(), AppError> {
+        let current = self.path.read().await.clone();
+        if current == path {
+            return self.apply_mode(mode).await;
+        }
+        let parent = path.parent().ok_or(AppError::LocalData)?;
+        let metadata = tokio::fs::symlink_metadata(parent).await?;
+        if !path.is_absolute() || !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(AppError::InvalidInput("cache directory"));
+        }
+        *self.path.write().await = path;
+        self.apply_mode(mode).await?;
+        if tokio::fs::try_exists(&current).await.unwrap_or(false) {
+            tokio::fs::remove_file(current)
                 .await
                 .map_err(|_| AppError::LocalData)?;
         }
-        tokio::fs::rename(temporary, &self.path)
+        Ok(())
+    }
+
+    async fn persist(&self) -> Result<(), AppError> {
+        let payload =
+            serde_json::to_vec(&*self.state.read().await).map_err(|_| AppError::LocalData)?;
+        let path = self.path.read().await.clone();
+        let parent = path.parent().ok_or(AppError::LocalData)?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|_| AppError::LocalData)?;
+        let temporary = path.with_extension("json.tmp");
+        reject_unsafe_file(&path).await?;
+        reject_unsafe_file(&temporary).await?;
+        tokio::fs::write(&temporary, payload)
+            .await
+            .map_err(|_| AppError::LocalData)?;
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            tokio::fs::remove_file(&path)
+                .await
+                .map_err(|_| AppError::LocalData)?;
+        }
+        tokio::fs::rename(temporary, path)
             .await
             .map_err(|_| AppError::LocalData)
     }
 
     async fn remove_disk_file(&self) -> Result<(), AppError> {
-        if tokio::fs::try_exists(&self.path).await.unwrap_or(false) {
-            tokio::fs::remove_file(&self.path)
+        let path = self.path.read().await.clone();
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            tokio::fs::remove_file(path)
                 .await
                 .map_err(|_| AppError::LocalData)?;
         }
         Ok(())
+    }
+}
+
+async fn reject_unsafe_file(path: &std::path::Path) -> Result<(), AppError> {
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => Ok(()),
+        Ok(_) => Err(AppError::LocalData),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(AppError::Io(error)),
     }
 }
 
@@ -233,5 +272,31 @@ mod tests {
         );
 
         std::fs::remove_dir_all(directory).expect("remove cache directory");
+    }
+
+    #[tokio::test]
+    async fn relocates_the_disk_cache_and_removes_the_old_file() {
+        let directory = std::env::temp_dir().join(format!("koofr-cache-{}", uuid::Uuid::new_v4()));
+        let old_directory = directory.join("old");
+        let new_directory = directory.join("new");
+        std::fs::create_dir_all(&old_directory).expect("create old cache directory");
+        std::fs::create_dir_all(&new_directory).expect("create new cache directory");
+        let old_path = old_directory.join("metadata-cache.json");
+        let new_path = new_directory.join("metadata-cache.json");
+        let cache = MetadataCache::load(old_path.clone(), false);
+        cache
+            .put("files:/".to_owned(), &vec!["one"], CacheMode::Disk)
+            .await
+            .expect("write old cache");
+
+        cache
+            .relocate(new_path.clone(), CacheMode::Disk)
+            .await
+            .expect("relocate cache");
+
+        assert!(!old_path.exists());
+        assert!(new_path.is_file());
+        assert_eq!(cache.stats().await.0, 1);
+        std::fs::remove_dir_all(directory).expect("remove cache directories");
     }
 }
