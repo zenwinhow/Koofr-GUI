@@ -97,6 +97,18 @@ export const koofr = {
     })
   },
 
+  updateTransferSettings(
+    autoRetryNetworkErrors: boolean,
+    networkRetryLimit: number | null,
+    networkRetryIntervalSeconds: number,
+  ) {
+    return invoke<AppSettings>('update_transfer_settings', {
+      autoRetryNetworkErrors,
+      networkRetryLimit,
+      networkRetryIntervalSeconds,
+    })
+  },
+
   updateDownloadSettings(downloadDirectory: string, askDownloadLocation: boolean) {
     return invoke<AppSettings>('update_download_settings', {
       downloadDirectory,

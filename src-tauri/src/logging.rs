@@ -78,6 +78,16 @@ impl AppLogger {
         self.record(LogLevel::Info, target, event, transfer_id, fields);
     }
 
+    pub fn warn(
+        &self,
+        target: &'static str,
+        event: &'static str,
+        transfer_id: Option<&str>,
+        fields: Map<String, Value>,
+    ) {
+        self.record(LogLevel::Warn, target, event, transfer_id, fields);
+    }
+
     pub fn error(
         &self,
         target: &'static str,

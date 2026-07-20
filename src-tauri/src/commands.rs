@@ -51,6 +51,9 @@ pub struct SettingsSnapshot {
     log_max_file_size_mb: u32,
     log_files: usize,
     log_disk_bytes: u64,
+    auto_retry_network_errors: bool,
+    network_retry_limit: Option<u32>,
+    network_retry_interval_seconds: u32,
 }
 
 #[tauri::command]
@@ -318,6 +321,7 @@ async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
         state.settings.log_policy().await;
     let (cached_items, cache_disk_bytes) = state.cache.stats().await;
     let (log_files, log_disk_bytes) = state.logger.stats().await;
+    let network_retry = state.settings.network_retry_settings().await;
     SettingsSnapshot {
         cache_mode,
         cache_ttl_minutes,
@@ -333,6 +337,9 @@ async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
         log_max_file_size_mb,
         log_files,
         log_disk_bytes,
+        auto_retry_network_errors: network_retry.enabled,
+        network_retry_limit: network_retry.max_retries,
+        network_retry_interval_seconds: network_retry.interval_seconds,
     }
 }
 
@@ -400,6 +407,31 @@ pub async fn update_logging_settings(
     state.logger.info(
         "settings",
         "logging_settings_updated",
+        None,
+        serde_json::Map::new(),
+    );
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn update_transfer_settings(
+    state: State<'_, AppState>,
+    auto_retry_network_errors: bool,
+    network_retry_limit: Option<u32>,
+    network_retry_interval_seconds: u32,
+) -> CommandResult<SettingsSnapshot> {
+    state
+        .settings
+        .update_transfer(
+            auto_retry_network_errors,
+            network_retry_limit,
+            network_retry_interval_seconds,
+        )
+        .await
+        .map_err(CommandError::from)?;
+    state.logger.info(
+        "settings",
+        "transfer_settings_updated",
         None,
         serde_json::Map::new(),
     );
@@ -709,11 +741,14 @@ pub async fn upload_file(
     let local_path = LocalUploadPath::from_selected(selected_path)
         .await
         .map_err(CommandError::from)?;
+    let retry_policy =
+        transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await);
     let result = transfer::upload(
         app,
         &state.api,
         &state.transfers,
         &state.transfer_checkpoints,
+        retry_policy,
         transfer_id,
         mount_id,
         directory,
@@ -744,11 +779,14 @@ pub async fn download_file(
     let local_path = LocalDownloadPath::from_selected(selected_path)
         .await
         .map_err(CommandError::from)?;
+    let retry_policy =
+        transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await);
     let result = transfer::download(
         app,
         &state.api,
         &state.transfers,
         &state.transfer_checkpoints,
+        retry_policy,
         transfer_id.clone(),
         mount_id,
         remote_path,

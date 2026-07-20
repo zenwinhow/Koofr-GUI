@@ -33,6 +33,7 @@ pub async fn resume_transfer(
         &state.api,
         &state.transfers,
         &state.transfer_checkpoints,
+        transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await),
         transfer_id.clone(),
     )
     .await

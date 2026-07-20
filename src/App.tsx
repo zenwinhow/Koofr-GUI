@@ -78,7 +78,9 @@ function App() {
   const collections = useKoofrCollections(authState === 'signedIn', activeItem)
   const workspaceLocation = useRef({ activeMountId: '', path: '/' })
   const activeMount = workspace.mounts.find((mount) => mount.id === workspace.activeMountId)
-  const runningTransfers = transfers.filter((transfer) => transfer.state === 'running').length
+  const runningTransfers = transfers.filter((transfer) => (
+    transfer.state === 'running' || transfer.state === 'retrying'
+  )).length
 
   useEffect(() => {
     workspaceLocation.current = {
@@ -245,6 +247,27 @@ function App() {
       showNotice('日志设置已保存')
     } catch (error) {
       setSettingsError(commandErrorMessage(error, '无法保存日志设置，请检查文件夹路径和参数。'))
+    } finally {
+      setSettingsBusy(false)
+    }
+  }
+
+  const updateTransferSettings = async (
+    autoRetryNetworkErrors: boolean,
+    networkRetryLimit: number | null,
+    networkRetryIntervalSeconds: number,
+  ) => {
+    setSettingsBusy(true)
+    setSettingsError('')
+    try {
+      setSettings(await koofr.updateTransferSettings(
+        autoRetryNetworkErrors,
+        networkRetryLimit,
+        networkRetryIntervalSeconds,
+      ))
+      showNotice('传输设置已保存')
+    } catch (error) {
+      setSettingsError(commandErrorMessage(error, '无法保存传输设置。'))
     } finally {
       setSettingsBusy(false)
     }
@@ -589,6 +612,7 @@ function App() {
   const clearFinishedTransfers = () => {
     setTransfers((current) => current.filter((item) => (
       item.state === 'running'
+      || item.state === 'retrying'
       || item.state === 'paused'
       || (item.state === 'failed' && item.recoveryKind !== null)
     )))
@@ -1001,6 +1025,11 @@ function App() {
               next.logLevel,
               next.logRetentionDays,
               next.logMaxFileSizeMb,
+            )}
+            onTransferSettingsChange={(next) => void updateTransferSettings(
+              next.autoRetryNetworkErrors,
+              next.networkRetryLimit,
+              next.networkRetryIntervalSeconds,
             )}
             onDownloadSettingsChange={(directory, askDownloadLocation) => {
               void updateDownloadSettings(directory, askDownloadLocation)

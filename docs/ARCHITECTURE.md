@@ -256,6 +256,17 @@ src-tauri/src/
 
 文件夹下载**不做**磁盘 checkpoint（重启后无法续传整个文件夹），因为 Koofr 目录清单可能已变；重新开始比"部分恢复导致混淆"更安全。已下载单个文件的字节 checkpoint 仍然保留。
 
+### 网络错误自动恢复
+
+设置中的 `autoRetryNetworkErrors` 只匹配 `AppError::Network`（前端错误码 `network_error`）。`networkRetryLimit` 表示初次请求失败后的最大重试次数，`null` 表示无限；`networkRetryIntervalSeconds` 是每次重试前使用的固定等待时间。等待期间会发出 `Retrying` 状态，暂停和取消仍由同一个 `CancellationToken` 控制。
+
+- 单文件下载重新读取临时文件长度并使用 HTTP Range 从已落盘偏移继续。
+- 分卷上传重新核对远端完整分卷，从最后一个已确认分卷继续。
+- 普通上传受 Koofr 整文件 `FilesPut` 接口限制，每次重试必须从文件开头重新发送。
+- 文件夹下载会清理本次失败的暂存树后，从头重建目录下载。
+- 权限、冲突、本地 I/O、HTTP 状态和内容完整性错误不会触发该策略。
+- 每次调度重试都会写入脱敏日志事件 `network_retry_scheduled`，仅包含传输 ID、方向、次数和延迟。
+
 ### 元数据缓存
 
 `MetadataCache` 三种模式：
@@ -322,7 +333,7 @@ pub enum AppError {
 
 认证 / 会话：`connect_koofr`, `restore_saved_login`, `disconnect_koofr`, `koofr_session`, `forget_saved_login`
 
-设置：`get_settings`, `update_settings`, `update_download_settings`, `update_logging_settings`, `clear_metadata_cache`, `clear_logs`, `select_settings_directory`
+设置：`get_settings`, `update_settings`, `update_download_settings`, `update_logging_settings`, `update_transfer_settings`, `clear_metadata_cache`, `clear_logs`, `select_settings_directory`
 
 文件浏览：`list_mounts`, `list_files`, `list_recent`, `list_shared`, `list_trash`
 

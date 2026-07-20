@@ -87,6 +87,7 @@ pub fn run() {
             commands::update_settings,
             commands::update_download_settings,
             commands::update_logging_settings,
+            commands::update_transfer_settings,
             commands::clear_metadata_cache,
             commands::clear_logs,
             commands::forget_saved_login,

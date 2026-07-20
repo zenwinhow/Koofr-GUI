@@ -18,8 +18,8 @@ use super::{
     checkpoint::{DownloadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     manager::TransferManager,
     model::{
-        TransferDirection, TransferResult, TransferState, emit_progress, emit_terminal,
-        normalize_interruption,
+        NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
+        emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
     },
     part::{open_partial, partial_length, truncate_partial, validate_checkpoint_paths},
     range::{ResponseMode, response_mode},
@@ -31,14 +31,13 @@ pub async fn download(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
     mount_id: MountId,
     remote_path: RemotePath,
     local_path: LocalDownloadPath,
 ) -> Result<TransferResult, AppError> {
-    let info = api.file_info(&mount_id, &remote_path).await?;
     let owner_id = account_owner(api).await?;
-    let expected_size = expected_size(&info)?;
     let checkpoint = DownloadCheckpoint {
         transfer_id: transfer_id.clone(),
         owner_id,
@@ -46,14 +45,16 @@ pub async fn download(
         remote_path: remote_path.as_str().to_owned(),
         partial_path: local_path.resumable_temporary_path(&transfer_id)?,
         local_path: local_path.as_path().to_path_buf(),
-        expected_size,
-        remote_hash: info.hash,
-        remote_modified: info.modified,
+        // The first registered run refreshes these fields. Keeping network discovery inside the
+        // registered transfer makes automatic retry, pause, and cancellation apply immediately.
+        expected_size: 0,
+        remote_hash: String::new(),
+        remote_modified: 0,
     };
     checkpoints
         .insert(TransferCheckpoint::Download(checkpoint.clone()))
         .await?;
-    run_download(app, api, manager, checkpoints, checkpoint).await
+    run_download(app, api, manager, checkpoints, retry_policy, checkpoint).await
 }
 
 pub async fn resume_download(
@@ -61,12 +62,13 @@ pub async fn resume_download(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     transfer_id: String,
 ) -> Result<TransferResult, AppError> {
     let TransferCheckpoint::Download(checkpoint) = checkpoints.get(&transfer_id).await? else {
         return Err(AppError::InvalidInput("download checkpoint"));
     };
-    run_download(app, api, manager, checkpoints, checkpoint).await
+    run_download(app, api, manager, checkpoints, retry_policy, checkpoint).await
 }
 
 async fn run_download(
@@ -74,16 +76,37 @@ async fn run_download(
     api: &KoofrApi,
     manager: &TransferManager,
     checkpoints: &TransferCheckpointStore,
+    retry_policy: NetworkRetryPolicy,
     mut checkpoint: DownloadCheckpoint,
 ) -> Result<TransferResult, AppError> {
     let transfer_id = checkpoint.transfer_id.clone();
     validate_checkpoint_paths(&checkpoint).await?;
     let cancel = manager.register(&transfer_id)?;
     let progress = Arc::new(AtomicU64::new(partial_length(&checkpoint).await?));
-    let result = refresh_remote(api, checkpoints, &mut checkpoint).await;
-    let result = match result {
-        Ok(()) => download_inner(&app, api, &cancel, &checkpoint, progress.clone()).await,
-        Err(error) => Err(error),
+    let mut retries_completed = 0_u32;
+    let result = loop {
+        let result = match refresh_remote(api, checkpoints, &mut checkpoint).await {
+            Ok(()) => download_inner(&app, api, &cancel, &checkpoint, progress.clone()).await,
+            Err(error) => Err(error),
+        };
+        if !should_retry_network(&result, retry_policy, retries_completed) {
+            break result;
+        }
+        retries_completed = retries_completed.saturating_add(1);
+        if let Err(error) = wait_for_network_retry(
+            &app,
+            &cancel,
+            &transfer_id,
+            TransferDirection::Download,
+            retries_completed,
+            progress.load(Ordering::Relaxed),
+            Some(checkpoint.expected_size),
+            retry_policy,
+        )
+        .await
+        {
+            break Err(error);
+        }
     };
     let paused = manager.was_paused(&transfer_id);
     manager.finish(&transfer_id);

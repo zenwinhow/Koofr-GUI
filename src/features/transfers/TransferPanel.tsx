@@ -28,6 +28,7 @@ interface TransferPanelProps {
 
 const stateLabels = {
   running: '正在传输',
+  retrying: '等待网络重试',
   paused: '已暂停',
   completed: '已完成',
   cancelled: '已取消',
@@ -52,7 +53,9 @@ export function TransferPanel({
   onOpenFolder,
   onClearFinished,
 }: TransferPanelProps) {
-  const runningCount = items.filter((item) => item.state === 'running').length
+  const runningCount = items.filter((item) => (
+    item.state === 'running' || item.state === 'retrying'
+  )).length
   const finishedCount = items.filter((item) => (
     item.state === 'completed'
     || item.state === 'cancelled'
@@ -115,7 +118,7 @@ export function TransferPanel({
                   </div>
                 ) : null}
               </div>
-              {item.state === 'running' ? (
+              {item.state === 'running' || item.state === 'retrying' ? (
                 <>
                   <button className="row-action" type="button" aria-label={`暂停 ${item.name}`} title="暂停" onClick={() => onPause(item.id)}>
                     <Pause size={16} />

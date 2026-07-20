@@ -1076,6 +1076,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .settings-path-actions button { padding: 7px 10px; border: 1px solid #d4d8dd; border-radius: 6px; background: var(--surface); color: #555c65; font-size: 10.5px; cursor: pointer; }
 .settings-path-actions button:hover:not(:disabled) { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 44%, #d4d8dd); color: var(--accent-dark); }
 .settings-switch-row { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid #e4e7ea; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.settings-switch-row--standalone { margin-top: 0; padding-top: 0; border-top: 0; }
 .settings-switch-row > span { min-width: 0; display: grid; gap: var(--space-1); }
 .settings-switch-row strong { color: #353a41; font-size: 12px; }
 .settings-switch-row small { color: var(--muted); font-size: 11.5px; line-height: 1.45; }

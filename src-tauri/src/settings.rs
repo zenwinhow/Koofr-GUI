@@ -33,6 +33,13 @@ pub struct SettingsDefaults {
     pub log_directory: PathBuf,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct NetworkRetrySettings {
+    pub enabled: bool,
+    pub max_retries: Option<u32>,
+    pub interval_seconds: u32,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredSettings {
@@ -54,6 +61,12 @@ struct StoredSettings {
     log_retention_days: u32,
     #[serde(default = "default_log_max_file_size_mb")]
     log_max_file_size_mb: u32,
+    #[serde(default)]
+    auto_retry_network_errors: bool,
+    #[serde(default = "default_network_retry_limit")]
+    network_retry_limit: Option<u32>,
+    #[serde(default = "default_network_retry_interval_seconds")]
+    network_retry_interval_seconds: u32,
 }
 
 const fn default_ask_download_location() -> bool {
@@ -66,6 +79,14 @@ const fn default_log_retention_days() -> u32 {
 
 const fn default_log_max_file_size_mb() -> u32 {
     10
+}
+
+const fn default_network_retry_limit() -> Option<u32> {
+    Some(8)
+}
+
+const fn default_network_retry_interval_seconds() -> u32 {
+    5
 }
 
 impl Default for StoredSettings {
@@ -82,6 +103,9 @@ impl Default for StoredSettings {
             log_level: LogLevel::Info,
             log_retention_days: default_log_retention_days(),
             log_max_file_size_mb: default_log_max_file_size_mb(),
+            auto_retry_network_errors: false,
+            network_retry_limit: default_network_retry_limit(),
+            network_retry_interval_seconds: default_network_retry_interval_seconds(),
         }
     }
 }
@@ -116,6 +140,15 @@ impl SettingsStore {
             .is_some_and(|directory| !is_existing_safe_directory(directory))
         {
             state.log_directory = None;
+        }
+        if state
+            .network_retry_limit
+            .is_some_and(|limit| !(1..=10_000).contains(&limit))
+        {
+            state.network_retry_limit = default_network_retry_limit();
+        }
+        if !(1..=3_600).contains(&state.network_retry_interval_seconds) {
+            state.network_retry_interval_seconds = default_network_retry_interval_seconds();
         }
         let initial_cache_directory = state
             .cache_directory
@@ -194,6 +227,15 @@ impl SettingsStore {
         )
     }
 
+    pub async fn network_retry_settings(&self) -> NetworkRetrySettings {
+        let state = self.state.read().await;
+        NetworkRetrySettings {
+            enabled: state.auto_retry_network_errors,
+            max_retries: state.network_retry_limit,
+            interval_seconds: state.network_retry_interval_seconds,
+        }
+    }
+
     pub async fn update_cache(
         &self,
         cache_mode: CacheMode,
@@ -233,6 +275,27 @@ impl SettingsStore {
             state.log_level = log_level;
             state.log_retention_days = log_retention_days;
             state.log_max_file_size_mb = log_max_file_size_mb;
+        }
+        self.persist().await
+    }
+
+    pub async fn update_transfer(
+        &self,
+        auto_retry_network_errors: bool,
+        network_retry_limit: Option<u32>,
+        network_retry_interval_seconds: u32,
+    ) -> Result<(), AppError> {
+        if network_retry_limit.is_some_and(|limit| !(1..=10_000).contains(&limit)) {
+            return Err(AppError::InvalidInput("network retry limit"));
+        }
+        if !(1..=3_600).contains(&network_retry_interval_seconds) {
+            return Err(AppError::InvalidInput("network retry interval"));
+        }
+        {
+            let mut state = self.state.write().await;
+            state.auto_retry_network_errors = auto_retry_network_errors;
+            state.network_retry_limit = network_retry_limit;
+            state.network_retry_interval_seconds = network_retry_interval_seconds;
         }
         self.persist().await
     }
@@ -405,6 +468,27 @@ mod tests {
 
         // Then
         assert!(result.is_err());
+        std::fs::remove_dir_all(directory).expect("remove settings directory");
+    }
+
+    #[tokio::test]
+    async fn persists_the_network_error_retry_switch() {
+        let directory =
+            std::env::temp_dir().join(format!("koofr-settings-{}", uuid::Uuid::new_v4()));
+        let path = directory.join("settings.json");
+        let store = SettingsStore::load(path.clone(), defaults(&directory));
+        assert!(!store.network_retry_settings().await.enabled);
+
+        store
+            .update_transfer(true, None, 30)
+            .await
+            .expect("enable network retry");
+        let reloaded = SettingsStore::load(path, defaults(&directory));
+        let retry = reloaded.network_retry_settings().await;
+
+        assert!(retry.enabled);
+        assert_eq!(retry.max_retries, None);
+        assert_eq!(retry.interval_seconds, 30);
         std::fs::remove_dir_all(directory).expect("remove settings directory");
     }
 }

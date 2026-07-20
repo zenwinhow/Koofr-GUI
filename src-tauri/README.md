@@ -28,10 +28,12 @@
 
 文件元数据缓存默认只存在内存里。用户可以在设置里开磁盘缓存并指定位置——缓存里只有普通 Koofr 文件名和远程路径，不包含密码、令牌或文件内容。切换到"不缓存"、清缓存或者换账户，缓存条目自动删掉。
 
+用户可选开启 `network_error` 自动恢复，并设置有限或无限的重试次数以及固定重试间隔。单文件下载从已落盘偏移继续，分卷上传从已确认分卷继续，普通上传由于 Koofr 只提供整文件上传接口而从头重试。等待期间仍接受暂停和取消，其他错误类别不会自动重试。
+
 ## Tauri 命令
 
 `connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
-`get_settings`、`update_settings`、`update_download_settings`、`update_logging_settings`、`clear_metadata_cache`、`clear_logs`、`select_settings_directory`、`forget_saved_login`、`select_upload_file`、
+`get_settings`、`update_settings`、`update_download_settings`、`update_logging_settings`、`update_transfer_settings`、`clear_metadata_cache`、`clear_logs`、`select_settings_directory`、`forget_saved_login`、`select_upload_file`、
 `select_download_location`、`select_download_folder`、`select_download_directory`、
 `prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、

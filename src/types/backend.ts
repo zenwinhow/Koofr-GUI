@@ -50,6 +50,9 @@ export interface AppSettings {
   readonly logMaxFileSizeMb: number
   readonly logFiles: number
   readonly logDiskBytes: number
+  readonly autoRetryNetworkErrors: boolean
+  readonly networkRetryLimit: number | null
+  readonly networkRetryIntervalSeconds: number
 }
 
 export interface KoofrMount {
@@ -114,7 +117,7 @@ export interface TrashRestoreTarget {
 }
 
 export type TransferDirection = 'upload' | 'download'
-export type TransferState = 'running' | 'paused' | 'completed' | 'cancelled' | 'failed'
+export type TransferState = 'running' | 'retrying' | 'paused' | 'completed' | 'cancelled' | 'failed'
 export type RecoveryKind = 'byte_resume' | 'chunk_resume' | 'restart'
 
 export interface TransferProgress {

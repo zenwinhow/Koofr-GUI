@@ -7,6 +7,7 @@ import {
   HardDrive,
   KeyRound,
   MemoryStick,
+  RefreshCw,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
@@ -28,6 +29,11 @@ interface SettingsPanelProps {
     logLevel: LogLevel
     logRetentionDays: number
     logMaxFileSizeMb: number
+  }) => void
+  readonly onTransferSettingsChange: (settings: {
+    autoRetryNetworkErrors: boolean
+    networkRetryLimit: number | null
+    networkRetryIntervalSeconds: number
   }) => void
   readonly onDownloadSettingsChange: (directory: string, askDownloadLocation: boolean) => void
   readonly onBrowseDownloadDirectory: () => Promise<string | null>
@@ -73,6 +79,7 @@ export function SettingsPanel({
   onCacheTtlChange,
   onCacheDirectoryChange,
   onLoggingSettingsChange,
+  onTransferSettingsChange,
   onDownloadSettingsChange,
   onBrowseDownloadDirectory,
   onBrowseSettingsDirectory,
@@ -213,6 +220,87 @@ export function SettingsPanel({
           >
             <span aria-hidden="true" />
           </button>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <header className="settings-section__heading">
+          <RefreshCw aria-hidden="true" />
+          <div>
+            <h3>传输恢复</h3>
+            <p>控制网络中断后的自动恢复行为，其他类型错误仍会立即停止。</p>
+          </div>
+        </header>
+        <div className="settings-switch-row settings-switch-row--standalone">
+          <span>
+            <strong>遇到网络错误时自动继续</strong>
+            <small>只处理 network_error。下载和分卷上传从断点继续，普通上传会从头重试。</small>
+          </span>
+          <button
+            className={`settings-switch${settings.autoRetryNetworkErrors ? ' settings-switch--on' : ''}`}
+            type="button"
+            role="switch"
+            aria-checked={settings.autoRetryNetworkErrors}
+            aria-label="遇到网络错误时自动继续"
+            disabled={busy}
+            onClick={() => onTransferSettingsChange({
+              autoRetryNetworkErrors: !settings.autoRetryNetworkErrors,
+              networkRetryLimit: settings.networkRetryLimit,
+              networkRetryIntervalSeconds: settings.networkRetryIntervalSeconds,
+            })}
+          >
+            <span aria-hidden="true" />
+          </button>
+        </div>
+        <div className="settings-row settings-row--compact-grid">
+          <label htmlFor="settings-network-retry-limit">
+            <strong>最大重试次数</strong>
+            <small>不包括最初的传输请求；可选择一直重试</small>
+          </label>
+          <select
+            id="settings-network-retry-limit"
+            aria-label="最大重试次数"
+            value={settings.networkRetryLimit ?? 'unlimited'}
+            disabled={busy || !settings.autoRetryNetworkErrors}
+            onChange={(event) => onTransferSettingsChange({
+              autoRetryNetworkErrors: settings.autoRetryNetworkErrors,
+              networkRetryLimit: event.target.value === 'unlimited'
+                ? null
+                : Number(event.target.value),
+              networkRetryIntervalSeconds: settings.networkRetryIntervalSeconds,
+            })}
+          >
+            <option value={3}>3 次</option>
+            <option value={5}>5 次</option>
+            <option value={8}>8 次</option>
+            <option value={10}>10 次</option>
+            <option value={20}>20 次</option>
+            <option value={50}>50 次</option>
+            <option value="unlimited">无限重试</option>
+          </select>
+          <label htmlFor="settings-network-retry-interval">
+            <strong>重试间隔</strong>
+            <small>每次网络错误后等待相同时间再继续</small>
+          </label>
+          <select
+            id="settings-network-retry-interval"
+            aria-label="重试间隔"
+            value={settings.networkRetryIntervalSeconds}
+            disabled={busy || !settings.autoRetryNetworkErrors}
+            onChange={(event) => onTransferSettingsChange({
+              autoRetryNetworkErrors: settings.autoRetryNetworkErrors,
+              networkRetryLimit: settings.networkRetryLimit,
+              networkRetryIntervalSeconds: Number(event.target.value),
+            })}
+          >
+            <option value={1}>1 秒</option>
+            <option value={3}>3 秒</option>
+            <option value={5}>5 秒</option>
+            <option value={10}>10 秒</option>
+            <option value={15}>15 秒</option>
+            <option value={30}>30 秒</option>
+            <option value={60}>1 分钟</option>
+          </select>
         </div>
       </section>
 

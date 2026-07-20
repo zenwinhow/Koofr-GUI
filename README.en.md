@@ -74,6 +74,7 @@ Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with res
 - **Settings**
   - Configurable default download folder, optional "ask each time" per-download prompt.
   - Metadata cache: memory / disk / off.
+  - Optional automatic retry for transfers that fail with `network_error`, with a configurable fixed interval and either a finite or unlimited retry count.
   - Five themes (koofr / ocean / iris / coral / berry) — accent tokens only.
 
 ### Not yet

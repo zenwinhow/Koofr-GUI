@@ -19,6 +19,9 @@ const SETTINGS: AppSettings = {
   logMaxFileSizeMb: 10,
   logFiles: 2,
   logDiskBytes: 2048,
+  autoRetryNetworkErrors: false,
+  networkRetryLimit: 8,
+  networkRetryIntervalSeconds: 5,
 }
 
 function renderSettings(overrides: Partial<Parameters<typeof SettingsPanel>[0]> = {}) {
@@ -32,6 +35,7 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsPanel>[0]> 
     onCacheTtlChange: vi.fn(),
     onCacheDirectoryChange: vi.fn(),
     onLoggingSettingsChange: vi.fn(),
+    onTransferSettingsChange: vi.fn(),
     onDownloadSettingsChange: vi.fn(),
     onBrowseDownloadDirectory: vi.fn(async () => null),
     onBrowseSettingsDirectory: vi.fn(async () => null),
@@ -112,6 +116,22 @@ describe('SettingsPanel storage and diagnostics', () => {
       logLevel: 'debug',
       logRetentionDays: 30,
       logMaxFileSizeMb: 25,
+    })
+  })
+})
+
+describe('SettingsPanel transfer recovery', () => {
+  it('enables automatic continuation for network errors', async () => {
+    const user = userEvent.setup()
+    const onTransferSettingsChange = vi.fn()
+    renderSettings({ onTransferSettingsChange })
+
+    await user.click(screen.getByRole('switch', { name: '遇到网络错误时自动继续' }))
+
+    expect(onTransferSettingsChange).toHaveBeenCalledWith({
+      autoRetryNetworkErrors: true,
+      networkRetryLimit: 8,
+      networkRetryIntervalSeconds: 5,
     })
   })
 })

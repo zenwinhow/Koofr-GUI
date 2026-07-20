@@ -56,6 +56,9 @@ pub async fn upload_split_file(
             api: &state.api,
             manager: &state.transfers,
             checkpoints: &state.transfer_checkpoints,
+            retry_policy: transfer::NetworkRetryPolicy::from(
+                state.settings.network_retry_settings().await,
+            ),
         },
         request,
     )
