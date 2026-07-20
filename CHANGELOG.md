@@ -2,7 +2,7 @@
 
 格式按 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号按 [SemVer](https://semver.org/spec/v2.0.0.html)。
 
-## [Unreleased]
+## [1.4.0] - 2026-07-20
 
 ### Added
 - 设置页新增“遇到网络错误时自动继续”开关，可设置最大重试次数（含无限）和固定重试间隔
