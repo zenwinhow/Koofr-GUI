@@ -35,6 +35,7 @@ describe('TransferPanel', () => {
     await user.click(screen.getByRole('button', { name: '继续下载 large.iso' }))
 
     expect(onResume).toHaveBeenCalledWith('transfer-1')
+    expect(screen.getByText('50%')).toBeTruthy()
     expect(screen.getByText('已暂停 · 64 B')).toBeTruthy()
   })
 

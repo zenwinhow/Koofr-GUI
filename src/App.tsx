@@ -15,6 +15,7 @@ import { SettingsPanel } from './features/settings/SettingsPanel'
 import { DownloadDestinationDialog } from './features/transfers/DownloadDestinationDialog'
 import { SplitUploadDialog } from './features/transfers/SplitUploadDialog'
 import { TransferPanel } from './features/transfers/TransferPanel'
+import { mergeTransferProgress } from './features/transfers/transferProgress'
 import { beginDownload } from './features/transfers/beginDownload'
 import {
   commandErrorMessage,
@@ -121,14 +122,7 @@ function App() {
     let unlisten: (() => void) | undefined
 
     void koofr.onTransferProgress((progress: TransferProgress) => {
-      setTransfers((current) => current.map((transfer) => transfer.id === progress.transferId
-        ? {
-            ...transfer,
-            state: progress.state,
-            bytesTransferred: progress.bytesTransferred,
-            totalBytes: progress.totalBytes,
-          }
-        : transfer))
+      setTransfers((current) => mergeTransferProgress(current, progress))
     }).then((stopListening) => {
       if (disposed) stopListening()
       else unlisten = stopListening
