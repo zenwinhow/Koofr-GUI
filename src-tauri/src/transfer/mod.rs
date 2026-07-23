@@ -13,6 +13,7 @@ mod split_part_io;
 mod split_support;
 mod split_upload;
 mod upload;
+mod vault;
 
 pub use checkpoint::{RecoveryKind, ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
@@ -27,6 +28,9 @@ pub use split_upload::{
     validate_split_part_bytes,
 };
 pub use upload::{retry_upload, upload};
+pub use vault::{
+    download_vault_file, resume_vault_download, resume_vault_upload, upload_vault_file,
+};
 
 pub struct ResumeOutcome {
     pub result: TransferResult,
@@ -38,6 +42,7 @@ pub async fn resume_checkpoint(
     api: &crate::koofr_api::KoofrApi,
     manager: &TransferManager,
     store: &TransferCheckpointStore,
+    vault: &crate::vault_core::VaultManager,
     retry_policy: NetworkRetryPolicy,
     transfer_id: String,
 ) -> Result<ResumeOutcome, crate::error::AppError> {
@@ -54,6 +59,25 @@ pub async fn resume_checkpoint(
             Ok(ResumeOutcome {
                 result,
                 completed_path: Some(completed_path),
+            })
+        }
+        checkpoint::TransferCheckpoint::VaultDownload(checkpoint) => {
+            let completed_path = checkpoint.local_path.clone();
+            let result =
+                resume_vault_download(app, api, manager, store, vault, retry_policy, checkpoint)
+                    .await?;
+            Ok(ResumeOutcome {
+                result,
+                completed_path: Some(completed_path),
+            })
+        }
+        checkpoint::TransferCheckpoint::VaultUpload(checkpoint) => {
+            let result =
+                resume_vault_upload(app, api, manager, store, vault, retry_policy, checkpoint)
+                    .await?;
+            Ok(ResumeOutcome {
+                result,
+                completed_path: None,
             })
         }
         checkpoint::TransferCheckpoint::SplitUpload(_) => {
@@ -92,8 +116,13 @@ pub async fn discard_checkpoint(
     if checkpoint.owner_id() != owner_id {
         return Err(crate::error::AppError::NotFound);
     }
-    if let checkpoint::TransferCheckpoint::Download(download) = checkpoint {
-        match tokio::fs::remove_file(download.partial_path).await {
+    let partial_path = match checkpoint {
+        checkpoint::TransferCheckpoint::Download(download) => Some(download.partial_path),
+        checkpoint::TransferCheckpoint::VaultDownload(download) => Some(download.partial_path),
+        _ => None,
+    };
+    if let Some(partial_path) = partial_path {
+        match tokio::fs::remove_file(partial_path).await {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),

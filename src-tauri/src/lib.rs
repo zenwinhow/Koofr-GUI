@@ -1,5 +1,6 @@
 mod commands;
 mod credential_manager;
+mod crypto;
 mod download_history;
 mod error;
 mod file_ops;
@@ -15,6 +16,8 @@ mod settings;
 mod split_commands;
 mod transfer;
 mod transfer_commands;
+mod vault_commands;
+mod vault_core;
 
 use credential_manager::CredentialManager;
 use download_history::DownloadHistoryStore;
@@ -25,6 +28,7 @@ use metadata_cache::MetadataCache;
 use settings::{SettingsDefaults, SettingsStore};
 use tauri::Manager;
 use transfer::{TransferCheckpointStore, TransferManager};
+use vault_core::VaultManager;
 
 pub struct AppState {
     api: KoofrApi,
@@ -36,6 +40,7 @@ pub struct AppState {
     cache: MetadataCache,
     credentials: CredentialManager,
     logger: AppLogger,
+    vault: VaultManager,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -67,6 +72,15 @@ pub fn run() {
                     .join("metadata-cache.json"),
                 settings.initial_cache_mode() == settings::CacheMode::Disk,
             );
+            let vault = VaultManager::default();
+            let vault_auto_lock = vault.clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+                    vault_auto_lock.lock_expired().await;
+                }
+            });
             app.manage(AppState {
                 api: KoofrApi::production()?,
                 local_access: LocalAccessManager::default(),
@@ -81,6 +95,7 @@ pub fn run() {
                 cache,
                 credentials: CredentialManager::initialize()?,
                 logger,
+                vault,
             });
             Ok(())
         })
@@ -132,6 +147,20 @@ pub fn run() {
             transfer_commands::clear_finished_download_history,
             transfer_commands::resume_transfer,
             transfer_commands::discard_resumable_transfer,
+            vault_commands::list_vaults,
+            vault_commands::unlock_vault,
+            vault_commands::lock_vault,
+            vault_commands::list_vault_files,
+            vault_commands::create_vault_folder,
+            vault_commands::rename_vault_entry,
+            vault_commands::relocate_vault_entry,
+            vault_commands::delete_vault_entries,
+            vault_commands::upload_vault_file,
+            vault_commands::download_vault_file,
+            vault_commands::create_vault,
+            vault_commands::remove_vault,
+            vault_commands::export_vault_rclone_config,
+            vault_commands::import_vault_rclone_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Koofr GUI");

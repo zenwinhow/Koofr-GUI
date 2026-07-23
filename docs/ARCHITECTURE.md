@@ -126,6 +126,7 @@ src-tauri/src/
 ├── link_commands.rs            分享链接命令
 ├── split_commands.rs           分卷上传命令
 ├── transfer_commands.rs        传输列表/恢复/丢弃命令
+├── vault_commands.rs           Vault 注册、原生 Safe Key 与文件命令
 ├── credential_manager.rs       Windows 凭据封装
 ├── settings.rs                 settings.json 读写
 ├── metadata_cache.rs           内存 + 磁盘缓存
@@ -144,9 +145,10 @@ src-tauri/src/
 │   ├── split_package.rs        分卷包元数据、清单、恢复脚本
 │   ├── checkpoint.rs           TransferCheckpointStore（持久化）
 │   ├── checkpoint_snapshot.rs  从磁盘 checkpoint 重建可恢复项
-│   └── part.rs                 .koofr-part-* 分片管理
-├── crypto/                     预留（Vault，未实现）
-└── vault_core/                 预留（Vault，未实现）
+│   ├── part.rs                 .koofr-part-* 分片管理
+│   └── vault.rs                Vault 加密上传 + 密文 Range 续传下载
+├── crypto/                     koofr/vault 加密引擎边界
+└── vault_core/                 解锁会话、不透明句柄、自动锁定
 ```
 
 ## 关键设计
@@ -159,6 +161,16 @@ src-tauri/src/
 - 下次启动时 `restore_saved_login()` 从凭据管理器读回密码，重新走一次 `/token`。
 - `disconnect_koofr()` 主动断开：取消所有传输、清 refresh token 缓冲区（`zeroize`）、清 LocalAccessManager 里未消费的授权。
 - 进程退出时同样 zeroize。
+
+### Koofr Vault
+
+- 加密实现固定使用官方 `koofr/vault` 的 `vault-crypto`，提交版本写在 `Cargo.toml` / `Cargo.lock`；格式与 rclone crypt 兼容，不定义私有密文格式。
+- Safe Key 通过 `CredUIPromptForCredentialsW` 的 Windows 原生凭据窗口直接进入 Rust。IPC、React 状态、日志、设置、缓存和传输检查点都不含 Safe Key、salt 明文配置或派生密钥。
+- scrypt 使用 rclone 默认参数（N=16384、r=8、p=1），派生内容密钥、AES-EME 文件名密钥和 tweak。文件内容采用 `RCLONE\0\0` 文件头、24 字节随机 nonce、64 KiB 明文块和 XSalsa20-Poly1305 认证标签。
+- 解锁后前端只获得解密后的显示名、类型、明文大小和短期 UUID 句柄；密文路径、Vault validator 和 rclone 配置不出 Rust。所有操作都由 Rust 把句柄重新解析到已注册 Vault 根目录内。
+- 每个 Vault 独立锁定，默认 60 分钟无 Vault 操作后自动清除会话。退出、重新登录或切换账户会立即清空全部解锁状态。正在执行的传输持有完成当前传输所需的临时密钥引用。
+- 加密上传流式生成新 nonce 的 rclone 密文；Koofr 只支持整文件 `FilesPut`，所以恢复语义是从头安全重传。加密下载持久化的只有密文远端路径和本地密文临时文件，使用 HTTP Range 字节续传；完整密文通过逐块认证后写入独立明文临时文件，再以不覆盖方式发布。
+- 创建使用 v2 内容 validator，仍可读取旧版 EME 文件名 validator。导入 / 导出仅接受单个指向 `koofr:` 的 crypt 配置；导出文件用 `create_new` 防覆盖，且其 `password` / `password2` 是 rclone 可恢复混淆值，必须当作敏感凭据。
 
 ### 路径与操作校验
 
@@ -329,7 +341,7 @@ pub enum AppError {
 
 ## 事件与命令目录
 
-**Tauri 命令**（前端 → Rust，由 `commands.rs` / `folder_commands.rs` / `link_commands.rs` / `split_commands.rs` / `transfer_commands.rs` 注册）：
+**Tauri 命令**（前端 → Rust，由各 `*_commands.rs` 注册）：
 
 认证 / 会话：`connect_koofr`, `restore_saved_login`, `disconnect_koofr`, `koofr_session`, `forget_saved_login`
 
@@ -344,6 +356,8 @@ pub enum AppError {
 传输：`upload_file`, `upload_split_file`, `download_file`, `download_folder`, `cancel_transfer`, `list_resumable_transfers`, `resume_transfer`, `discard_resumable_transfer`
 
 分享链接：`list_public_links`, `create_public_link`, `delete_public_link`
+
+Vault：`list_vaults`, `unlock_vault`, `lock_vault`, `list_vault_files`, `create_vault_folder`, `rename_vault_entry`, `relocate_vault_entry`, `delete_vault_entries`, `upload_vault_file`, `download_vault_file`, `create_vault`, `remove_vault`, `export_vault_rclone_config`, `import_vault_rclone_config`
 
 **Tauri 事件**（Rust → 前端）：
 
@@ -366,21 +380,13 @@ pub enum AppError {
 
 **下载临时文件**（在用户配置的下载目录下）：
 
-- `.koofr-part-<transferId>`：单文件下载暂存。
+- `.koofr-part-<transferId>`：普通单文件下载暂存；Vault 下载时保存完整密文，同样按传输 ID 隔离。
+- `.<name>.koofr-vault-plain-<transferId>`：Vault 完整认证后的短期明文暂存；成功后原子改为最终文件名，失败时清理。
 - `.koofr-folder-<transferId>/`：文件夹下载暂存目录。
 
 清理 / 卸载应用时，这三处都不会自动删除，需要用户手动处理。
 
 ## 未实现的部分
-
-### `crypto/` 和 `vault_core/`
-
-Koofr Vault = Koofr 网页端一个基于 rclone crypt 的端到端加密卷。规划中的实现要点（不是承诺时间线）：
-
-- 前端只见密文文件名 / 密文目录结构，Vault Safe Key **绝不进前端**。
-- 解密 / 加密 / 文件名 EME 全部在 Rust 侧。
-- 格式必须兼容 rclone crypt，能被 Koofr 网页端和 rclone 无损互操作。
-- 密钥派生用 scrypt（rclone crypt 默认）。
 
 ### OAuth 和第三方存储管理
 

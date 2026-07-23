@@ -16,8 +16,13 @@ export interface CommandError {
     | 'invalid_response'
     | 'initialization_error'
     | 'dialog_error'
+    | 'local_open_error'
     | 'local_data_error'
     | 'credential_store_error'
+    | 'vault_locked'
+    | 'vault_invalid_key'
+    | 'vault_crypto_error'
+    | 'vault_prompt_error'
   message: string
   diagnostic?: string
 }
@@ -167,4 +172,34 @@ export interface LocalFileSelection {
   readonly grantId: string
   readonly fileName: string
   readonly localPath: string | null
+}
+
+export interface VaultSummary {
+  readonly id: string
+  readonly name: string
+  readonly locked: boolean
+  readonly added: number
+  readonly autoLockSeconds: number
+}
+
+export interface VaultBreadcrumb {
+  readonly id: string
+  readonly name: string
+}
+
+export interface VaultEntry {
+  readonly id: string
+  readonly name: string
+  readonly entryType: 'file' | 'dir'
+  readonly modified: number
+  readonly size: number
+  readonly contentType: string
+}
+
+export interface VaultDirectory {
+  readonly repoId: string
+  readonly repoName: string
+  readonly directoryId: string
+  readonly breadcrumbs: VaultBreadcrumb[]
+  readonly entries: VaultEntry[]
 }

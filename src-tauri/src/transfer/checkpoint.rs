@@ -34,6 +34,34 @@ pub struct DownloadCheckpoint {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct VaultDownloadCheckpoint {
+    pub transfer_id: String,
+    pub owner_id: String,
+    pub repo_id: String,
+    pub mount_id: String,
+    pub remote_path: String,
+    pub local_path: PathBuf,
+    pub partial_path: PathBuf,
+    pub expected_size: u64,
+    pub remote_hash: String,
+    pub remote_modified: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultUploadCheckpoint {
+    pub transfer_id: String,
+    pub owner_id: String,
+    pub repo_id: String,
+    pub mount_id: String,
+    pub remote_directory: String,
+    pub local_path: PathBuf,
+    pub expected_size: u64,
+    pub modified_millis: u128,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadCheckpoint {
     pub transfer_id: String,
     pub owner_id: String,
@@ -63,6 +91,8 @@ pub struct SplitUploadCheckpoint {
 #[serde(tag = "direction", content = "checkpoint", rename_all = "snake_case")]
 pub enum TransferCheckpoint {
     Download(DownloadCheckpoint),
+    VaultDownload(VaultDownloadCheckpoint),
+    VaultUpload(VaultUploadCheckpoint),
     SplitUpload(SplitUploadCheckpoint),
     Upload(UploadCheckpoint),
 }
@@ -71,6 +101,8 @@ impl TransferCheckpoint {
     fn transfer_id(&self) -> &str {
         match self {
             Self::Download(checkpoint) => &checkpoint.transfer_id,
+            Self::VaultDownload(checkpoint) => &checkpoint.transfer_id,
+            Self::VaultUpload(checkpoint) => &checkpoint.transfer_id,
             Self::SplitUpload(checkpoint) => &checkpoint.transfer_id,
             Self::Upload(checkpoint) => &checkpoint.transfer_id,
         }
@@ -79,6 +111,8 @@ impl TransferCheckpoint {
     pub fn owner_id(&self) -> &str {
         match self {
             Self::Download(checkpoint) => &checkpoint.owner_id,
+            Self::VaultDownload(checkpoint) => &checkpoint.owner_id,
+            Self::VaultUpload(checkpoint) => &checkpoint.owner_id,
             Self::SplitUpload(checkpoint) => &checkpoint.owner_id,
             Self::Upload(checkpoint) => &checkpoint.owner_id,
         }

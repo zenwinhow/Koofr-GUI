@@ -66,6 +66,7 @@ pub async fn connect_koofr(
 ) -> CommandResult<SessionInfo> {
     state.transfers.cancel_all();
     state.local_access.clear();
+    state.vault.reset().await;
     let app_password = Zeroizing::new(app_password);
     let session = state
         .api
@@ -152,6 +153,7 @@ pub async fn restore_saved_login(state: State<'_, AppState>) -> CommandResult<Lo
         .authenticate(&email, password.as_str())
         .await
         .map_err(CommandError::from)?;
+    state.vault.reset().await;
     let (mode, _) = state.settings.cache_policy().await;
     let _ = state
         .cache
@@ -172,6 +174,7 @@ pub async fn restore_saved_login(state: State<'_, AppState>) -> CommandResult<Lo
 #[tauri::command]
 pub async fn disconnect_koofr(state: State<'_, AppState>) -> CommandResult<()> {
     state.transfers.cancel_all();
+    state.vault.reset().await;
     state.api.disconnect().await;
     state.local_access.clear();
     Ok(())

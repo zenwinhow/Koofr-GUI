@@ -1,5 +1,6 @@
 mod models;
 mod public_links;
+mod vault;
 
 use std::{
     collections::{HashSet, hash_map::DefaultHasher},
@@ -23,6 +24,7 @@ use models::{
     TrashListResponse,
 };
 pub use public_links::{PublicLink, PublicLinkKind};
+pub use vault::{VaultRepo, VaultRepoCreate};
 
 const USER_AGENT: &str = concat!("Koofr-GUI/", env!("CARGO_PKG_VERSION"));
 

@@ -47,6 +47,14 @@ pub enum AppError {
     CredentialStore,
     #[error("the downloaded file could not be opened")]
     LocalOpen,
+    #[error("the vault is locked")]
+    VaultLocked,
+    #[error("the Safe Key is not correct")]
+    VaultInvalidKey,
+    #[error("vault cryptographic data is invalid")]
+    VaultCrypto,
+    #[error("the native Safe Key prompt failed")]
+    VaultPrompt,
 }
 
 impl From<reqwest::Error> for AppError {
@@ -94,6 +102,10 @@ impl AppError {
             Self::LocalData => "local_data_error",
             Self::CredentialStore => "credential_store_error",
             Self::LocalOpen => "local_open_error",
+            Self::VaultLocked => "vault_locked",
+            Self::VaultInvalidKey => "vault_invalid_key",
+            Self::VaultCrypto => "vault_crypto_error",
+            Self::VaultPrompt => "vault_prompt_error",
         }
     }
 
@@ -207,6 +219,18 @@ impl From<AppError> for CommandError {
             AppError::LocalOpen => Self::new(
                 "local_open_error",
                 "无法打开下载内容，它可能已被移动、删除或没有关联的应用。",
+            ),
+            AppError::VaultLocked => Self::new("vault_locked", "私人保险箱已锁定，请先解锁。"),
+            AppError::VaultInvalidKey => {
+                Self::new("vault_invalid_key", "Safe Key 不正确，请检查后重试。")
+            }
+            AppError::VaultCrypto => Self::new(
+                "vault_crypto_error",
+                "保险箱内容无法安全解密，Safe Key、Salt 或密文可能不匹配。",
+            ),
+            AppError::VaultPrompt => Self::new(
+                "vault_prompt_error",
+                "无法打开 Windows Safe Key 安全输入窗口。",
             ),
         }
     }

@@ -45,7 +45,7 @@ Built with Tauri v2 + React + TypeScript + Rust. Aims to feel like a native file
 
 [Koofr](https://koofr.eu) is a European cloud storage provider that aggregates Google Drive, OneDrive, Dropbox and other third-party accounts under one login. Its web UI is not always smooth from mainland China, and there is no official Windows desktop client.
 
-Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with resumable large-file transfers, that does not stuff tokens into a WebView. The current release is **1.3.3**, covering the main Koofr file-management flows, resumable transfers and public-link management. Koofr Vault (end-to-end encryption) is not implemented yet.
+Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with resumable large-file transfers that does not stuff tokens into a WebView. The current version covers the main Koofr file-management flows, resumable transfers, public-link management, and an end-to-end encrypted workspace interoperable with Koofr Vault and rclone crypt.
 
 ## Screenshots
 
@@ -71,6 +71,13 @@ Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with res
   - **Split upload**: chops a large file into user-sized `part-*.bin` chunks in a user-named remote folder. Resumes from the last confirmed complete chunk. Parts contain no proprietary header — reassemble with `copy /b` on Windows or `cat` on POSIX.
   - **Recursive folder download**: staged into a temporary directory, cleaned up on failure or cancel.
 
+- **Koofr Vault (end-to-end encryption)**
+  - Create, import, export, unlock, lock, and unregister Vaults; browse decrypted metadata and create, rename, move, copy, or delete encrypted entries.
+  - The Safe Key is entered only in a native Windows credential prompt and remains in Rust memory. The WebView receives decrypted display metadata plus short-lived opaque handles.
+  - AES-EME names, rclone's `RCLONE\0\0` + chunked XSalsa20-Poly1305 content format, and rclone-compatible default scrypt parameters.
+  - Encrypted uploads support safe whole-file restart. Encrypted downloads resume ciphertext with HTTP Range and only publish the plaintext after complete authentication and decryption.
+  - Import/export of rclone crypt configs. Exported configs contain an obscured but recoverable Safe Key and must be handled as credentials.
+
 - **Settings**
   - Configurable default download folder, optional "ask each time" per-download prompt.
   - Metadata cache: memory / disk / off.
@@ -79,7 +86,6 @@ Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with res
 
 ### Not yet
 
-- Koofr Vault unlock, encrypt/decrypt, Vault transfers (`src-tauri/src/crypto/` and `vault_core/` are placeholders).
 - OAuth sign-in and add/remove/re-authorize third-party mounts. Blocked on Koofr publishing desktop client registration info and a public authorization API. Today the app can list existing mounts and link out to the official Koofr account page.
 - macOS / Linux support.
 
@@ -167,14 +173,15 @@ See [BUILDING.md](docs/BUILDING.md) for the full walk-through and troubleshootin
 │ ├─ koofr_api/          Koofr REST client     │
 │ ├─ credential_manager  Windows Credentials   │
 │ ├─ metadata_cache      memory / disk cache   │
-│ ├─ crypto/             reserved (Vault)      │
-│ └─ vault_core/         reserved (Vault)      │
+│ ├─ crypto/             rclone crypt boundary │
+│ └─ vault_core/         sessions + handles    │
 └──────────────────────────────────────────────┘
 ```
 
 Rules that matter:
 
 - **Credentials never cross the Rust boundary.** Session tokens live in memory only; the optional app-password persistence uses the Windows Credential Manager.
+- **Safe Keys never cross the Rust boundary.** A native Windows credential prompt passes them directly to Rust, never through Tauri IPC, React state, logs, or checkpoints.
 - **Paths are validated.** Remote paths reject `.`, `..`, NUL, and overlong names. Download parents must be absolute, existing, non-symlink directories.
 - **Never overwrite.** Single-file downloads land in a `.koofr-part-*` staging file. Same-directory name clashes get a stable suffix.
 - **Error messages leak nothing** — stable error code + safe message. No paths, tokens, or response bodies.
@@ -198,7 +205,7 @@ App data lives under the current Windows user's local data directory (`identifie
 
 ## Roadmap
 
-- [ ] Koofr Vault unlock + encrypt/decrypt + Vault transfers (rclone crypt compatible)
+- [x] Koofr Vault unlock + encrypt/decrypt + Vault transfers (rclone crypt compatible)
 - [ ] OAuth sign-in & third-party mount management (blocked on public Koofr desktop API)
 - [ ] Code signing / SmartScreen reputation
 - [ ] macOS support
@@ -226,5 +233,5 @@ This project is **not affiliated** with Koofr d.o.o. "Koofr" is a trademark of [
 
 - [Koofr](https://koofr.eu) for the cloud storage service and their reference [Go client](https://github.com/koofr/go-koofrclient) / [Java SDK](https://github.com/koofr/java-koofr).
 - The [Tauri](https://tauri.app) team for the desktop framework.
-- [rclone](https://rclone.org) for the Koofr backend and crypt format — reference for split upload and future Vault compatibility.
+- The `vault-crypto` library from [Koofr Vault](https://github.com/koofr/vault), with interoperability with [rclone](https://rclone.org)'s crypt format.
 - [Lucide](https://lucide.dev) for the icon set.

@@ -1,6 +1,6 @@
 [package]
 name = "koofr-gui"
-version = "1.5.1"
+version = "1.6.0"
 description = "Windows-first desktop client for Koofr"
 authors = ["Koofr-GUI contributors"]
 edition = "2024"
@@ -15,6 +15,7 @@ tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
 futures-util = "0.3.32"
+data-encoding = "2.9.0"
 keyring-core = "1.0.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "multipart", "query", "rustls", "stream"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -24,11 +25,12 @@ tauri = { version = "2.11.5", features = [] }
 tauri-plugin-dialog = "2.7.1"
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["fs", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
-tokio-util = { version = "0.7.18", features = ["io", "rt"] }
+tokio-util = { version = "0.7.18", features = ["compat", "io", "rt"] }
 url = "2.5.8"
 uuid = { version = "1.23.0", features = ["v4"] }
+vault-crypto = { git = "https://github.com/koofr/vault.git", rev = "17c95914dbc25f42f71869d1878f58a6675474ce" }
 windows-native-keyring-store = "1.1.0"
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Security_Credentials", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 zeroize = "1.8.2"
 
 [dev-dependencies]
