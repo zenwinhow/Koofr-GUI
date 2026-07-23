@@ -233,5 +233,5 @@ This project is **not affiliated** with Koofr d.o.o. "Koofr" is a trademark of [
 
 - [Koofr](https://koofr.eu) for the cloud storage service and their reference [Go client](https://github.com/koofr/go-koofrclient) / [Java SDK](https://github.com/koofr/java-koofr).
 - The [Tauri](https://tauri.app) team for the desktop framework.
-- [Koofr Vault](https://github.com/koofr/vault) and [rclone](https://rclone.org) for the interoperable Vault crypt format.
+- The `vault-crypto` library from [Koofr Vault](https://github.com/koofr/vault), with interoperability with [rclone](https://rclone.org)'s crypt format.
 - [Lucide](https://lucide.dev) for the icon set.

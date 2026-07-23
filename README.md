@@ -234,5 +234,5 @@ npm run build:installer      # 显式生成 NSIS 安装包
 
 - [Koofr](https://koofr.eu) 提供的云存储服务和 [Go 客户端](https://github.com/koofr/go-koofrclient) / [Java SDK](https://github.com/koofr/java-koofr) 参考实现。
 - [Tauri](https://tauri.app) 团队的桌面框架。
-- [Koofr Vault](https://github.com/koofr/vault) 与 [rclone](https://rclone.org) 的 crypt 格式，为 Vault 互操作实现提供参考。
+- 加密库使用 [Koofr Vault](https://github.com/koofr/vault) 提供的 `vault-crypto`，并与 [rclone](https://rclone.org) 的 crypt 格式保持互操作。
 - [Lucide](https://lucide.dev) 的图标集。
