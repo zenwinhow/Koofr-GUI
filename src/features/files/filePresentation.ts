@@ -3,10 +3,61 @@ import type { FileKind } from '../../types/files'
 
 const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
 const ARCHIVE_EXTENSIONS: ReadonlySet<string> = new Set([
-  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'tgz', 'tbz2', 'txz',
+  'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'zst', 'zstd', 'lz', 'lzma', 'lz4',
+  'tgz', 'tbz', 'tbz2', 'txz', 'tzst', 'z', 'cab', 'arj', 'ace', 'sit', 'sitx',
 ])
 const EXECUTABLE_EXTENSIONS: ReadonlySet<string> = new Set([
-  'exe', 'msi', 'msix', 'appx', 'bat', 'cmd', 'com', 'ps1',
+  'exe', 'msi', 'msix', 'appx', 'appxbundle', 'bat', 'cmd', 'com', 'ps1',
+  'apk', 'aab', 'ipa', 'app', 'deb', 'rpm', 'pkg', 'dmg', 'snap', 'flatpak', 'appimage',
+])
+const VIDEO_EXTENSIONS: ReadonlySet<string> = new Set([
+  'mp4', 'm4v', 'mov', 'avi', 'wmv', 'flv', 'mkv', 'webm', 'mpeg', 'mpg', 'mpe',
+  'mts', 'm2ts', 'ts', '3gp', '3g2', 'vob', 'ogv', 'rm', 'rmvb', 'asf', 'f4v',
+])
+const AUDIO_EXTENSIONS: ReadonlySet<string> = new Set([
+  'mp3', 'wav', 'flac', 'aac', 'm4a', 'm4b', 'ogg', 'oga', 'opus', 'wma',
+  'aiff', 'aif', 'ape', 'alac', 'amr', 'mid', 'midi', 'dsd', 'dsf', 'dff',
+])
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'png', 'jpg', 'jpeg', 'jfif', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'ico',
+  'svg', 'heic', 'heif', 'avif', 'raw', 'cr2', 'nef', 'arw', 'dng', 'orf', 'raf', 'psd', 'ai',
+])
+const CODE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'js', 'jsx', 'mjs', 'cjs', 'tsx', 'json', 'jsonc', 'json5',
+  'html', 'htm', 'xhtml', 'xml', 'xsl', 'xslt', 'css', 'scss', 'sass', 'less', 'styl',
+  'py', 'pyw', 'ipynb', 'rb', 'php', 'go', 'rs', 'toml',
+  'java', 'kt', 'kts', 'scala', 'groovy', 'gradle',
+  'c', 'h', 'cc', 'cpp', 'cxx', 'hh', 'hpp', 'hxx', 'm', 'mm',
+  'cs', 'fs', 'fsx', 'vb', 'swift', 'dart',
+  'sh', 'bash', 'zsh', 'fish', 'sql',
+  'lua', 'pl', 'pm', 'r', 'jl', 'ex', 'exs', 'erl', 'elm', 'clj', 'cljs', 'hs',
+  'yaml', 'yml', 'ini', 'cfg', 'conf', 'env', 'properties',
+  'vue', 'svelte', 'astro',
+])
+const TEXT_EXTENSIONS: ReadonlySet<string> = new Set([
+  'txt', 'md', 'markdown', 'rst', 'rtf', 'log', 'csv', 'tsv',
+  'tex', 'bib', 'org', 'adoc', 'asciidoc',
+])
+const FONT_EXTENSIONS: ReadonlySet<string> = new Set([
+  'ttf', 'otf', 'woff', 'woff2', 'eot', 'ttc', 'pfa', 'pfb',
+])
+const EBOOK_EXTENSIONS: ReadonlySet<string> = new Set([
+  'epub', 'mobi', 'azw', 'azw3', 'kfx', 'fb2', 'lit', 'lrf', 'ibooks',
+])
+const DISK_EXTENSIONS: ReadonlySet<string> = new Set([
+  'iso', 'img', 'vhd', 'vhdx', 'vmdk', 'vdi', 'qcow2', 'cue', 'nrg', 'mds', 'mdf',
+])
+const DATABASE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'db', 'sqlite', 'sqlite3', 'mdb', 'accdb', 'dbf', 'parquet', 'orc', 'avro', 'arrow', 'feather',
+])
+const SPREADSHEET_EXTENSIONS: ReadonlySet<string> = new Set([
+  'xlsx', 'xlsm', 'xlsb', 'xls', 'xltx', 'xltm', 'ods', 'numbers',
+])
+const DOCUMENT_EXTENSIONS: ReadonlySet<string> = new Set([
+  'docx', 'docm', 'doc', 'dotx', 'dotm', 'odt', 'pages', 'wps',
+])
+const PRESENTATION_EXTENSIONS: ReadonlySet<string> = new Set([
+  'pptx', 'pptm', 'ppt', 'potx', 'potm', 'ppsx', 'pps', 'odp', 'key',
 ])
 const MODIFIED_DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric',
@@ -23,14 +74,30 @@ export function isDirectory(file: RemoteFile) {
 
 export function fileKind(file: RemoteFile): FileKind {
   if (isDirectory(file)) return 'folder'
-  if (file.contentType.startsWith('image/')) return 'image'
+  const contentType = file.contentType.toLowerCase()
+  if (contentType.startsWith('image/')) return 'image'
+  if (contentType.startsWith('video/')) return 'video'
+  if (contentType.startsWith('audio/')) return 'audio'
+  return fileKindByName(file.name)
+}
 
-  const extension = file.name.split('.').pop()?.toLocaleLowerCase('en-US') ?? ''
+export function fileKindByName(name: string): FileKind {
+  const extension = name.split('.').pop()?.toLocaleLowerCase('en-US') ?? ''
+  if (IMAGE_EXTENSIONS.has(extension)) return 'image'
+  if (VIDEO_EXTENSIONS.has(extension)) return 'video'
+  if (AUDIO_EXTENSIONS.has(extension)) return 'audio'
   if (ARCHIVE_EXTENSIONS.has(extension)) return 'archive'
   if (EXECUTABLE_EXTENSIONS.has(extension)) return 'executable'
-  if (extension === 'xlsx' || extension === 'xls' || extension === 'ods') return 'xlsx'
+  if (SPREADSHEET_EXTENSIONS.has(extension)) return 'xlsx'
   if (extension === 'pdf') return 'pdf'
-  if (extension === 'docx' || extension === 'doc' || extension === 'odt') return 'docx'
+  if (DOCUMENT_EXTENSIONS.has(extension)) return 'docx'
+  if (PRESENTATION_EXTENSIONS.has(extension)) return 'pptx'
+  if (CODE_EXTENSIONS.has(extension)) return 'code'
+  if (TEXT_EXTENSIONS.has(extension)) return 'text'
+  if (FONT_EXTENSIONS.has(extension)) return 'font'
+  if (EBOOK_EXTENSIONS.has(extension)) return 'ebook'
+  if (DISK_EXTENSIONS.has(extension)) return 'disk'
+  if (DATABASE_EXTENSIONS.has(extension)) return 'database'
   return 'file'
 }
 

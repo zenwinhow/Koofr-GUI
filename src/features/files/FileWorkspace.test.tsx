@@ -50,9 +50,18 @@ describe('FileWorkspace', () => {
       { name: 'budget.xlsx', entryType: 'file', contentType: 'application/vnd.ms-excel', path: '/budget.xlsx' },
       { name: 'brief.pdf', entryType: 'file', contentType: 'application/pdf', path: '/brief.pdf' },
       { name: 'notes.docx', entryType: 'file', contentType: 'application/msword', path: '/notes.docx' },
+      { name: 'deck.pptx', entryType: 'file', contentType: 'application/vnd.ms-powerpoint', path: '/deck.pptx' },
       { name: 'cover.png', entryType: 'file', contentType: 'image/png', path: '/cover.png' },
+      { name: 'clip.mp4', entryType: 'file', contentType: 'video/mp4', path: '/clip.mp4' },
+      { name: 'track.mp3', entryType: 'file', contentType: 'audio/mpeg', path: '/track.mp3' },
       { name: 'source.zip', entryType: 'file', contentType: 'application/zip', path: '/source.zip' },
       { name: 'setup.exe', entryType: 'file', contentType: 'application/octet-stream', path: '/setup.exe' },
+      { name: 'app.tsx', entryType: 'file', contentType: 'application/octet-stream', path: '/app.tsx' },
+      { name: 'readme.md', entryType: 'file', contentType: 'text/markdown', path: '/readme.md' },
+      { name: 'Inter.ttf', entryType: 'file', contentType: 'font/ttf', path: '/Inter.ttf' },
+      { name: 'novel.epub', entryType: 'file', contentType: 'application/epub+zip', path: '/novel.epub' },
+      { name: 'ubuntu.iso', entryType: 'file', contentType: 'application/octet-stream', path: '/ubuntu.iso' },
+      { name: 'store.sqlite', entryType: 'file', contentType: 'application/octet-stream', path: '/store.sqlite' },
       { name: 'archive.bin', entryType: 'file', contentType: 'application/octet-stream', path: '/archive.bin' },
     ].map((file) => ({ ...file, modified: 0, size: 0, hash: '' })) satisfies RemoteFile[]
 
@@ -72,7 +81,10 @@ describe('FileWorkspace', () => {
 
     // Then
     expect(new Set([...container.querySelectorAll('[data-file-kind]')].map((node) => node.getAttribute('data-file-kind'))))
-      .toEqual(new Set(['folder', 'file', 'xlsx', 'image', 'pdf', 'docx', 'archive', 'executable']))
+      .toEqual(new Set([
+        'folder', 'file', 'xlsx', 'image', 'pdf', 'docx', 'pptx', 'video', 'audio',
+        'archive', 'executable', 'code', 'text', 'font', 'ebook', 'disk', 'database',
+      ]))
   })
 
   it('shares the selected file instead of asking for a path', async () => {

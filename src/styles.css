@@ -34,12 +34,30 @@
   --file-pdf-deep: #ac322d;
   --file-doc: #3979c7;
   --file-doc-deep: #285891;
+  --file-slides: #d97a2b;
+  --file-slides-deep: #a2540f;
   --file-image: #765ac2;
   --file-image-deep: #563d9c;
+  --file-video: #d24aa1;
+  --file-video-deep: #9d2b78;
+  --file-audio: #d63d6a;
+  --file-audio-deep: #a3234c;
   --file-archive: #b0712b;
   --file-archive-deep: #7d4b18;
   --file-executable: #397b91;
   --file-executable-deep: #245264;
+  --file-code: #1c8079;
+  --file-code-deep: #0f5a54;
+  --file-text: #5d6c7a;
+  --file-text-deep: #3d4956;
+  --file-font: #a44ecd;
+  --file-font-deep: #7a2ea3;
+  --file-ebook: #3f7c58;
+  --file-ebook-deep: #23593a;
+  --file-disk: #5b6ec2;
+  --file-disk-deep: #3a4c99;
+  --file-database: #b48420;
+  --file-database-deep: #7f5a0d;
   --file-generic: #74808d;
   --file-generic-deep: #4d5864;
   --space-1: 4px;
@@ -856,9 +874,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .file-type-icon--xlsx { --file-icon-main: var(--file-sheet); --file-icon-deep: var(--file-sheet-deep); }
 .file-type-icon--pdf { --file-icon-main: var(--file-pdf); --file-icon-deep: var(--file-pdf-deep); }
 .file-type-icon--docx { --file-icon-main: var(--file-doc); --file-icon-deep: var(--file-doc-deep); }
+.file-type-icon--pptx { --file-icon-main: var(--file-slides); --file-icon-deep: var(--file-slides-deep); }
 .file-type-icon--image { --file-icon-main: var(--file-image); --file-icon-deep: var(--file-image-deep); }
+.file-type-icon--video { --file-icon-main: var(--file-video); --file-icon-deep: var(--file-video-deep); }
+.file-type-icon--audio { --file-icon-main: var(--file-audio); --file-icon-deep: var(--file-audio-deep); }
 .file-type-icon--archive { --file-icon-main: var(--file-archive); --file-icon-deep: var(--file-archive-deep); }
 .file-type-icon--executable { --file-icon-main: var(--file-executable); --file-icon-deep: var(--file-executable-deep); }
+.file-type-icon--code { --file-icon-main: var(--file-code); --file-icon-deep: var(--file-code-deep); }
+.file-type-icon--text { --file-icon-main: var(--file-text); --file-icon-deep: var(--file-text-deep); }
+.file-type-icon--font { --file-icon-main: var(--file-font); --file-icon-deep: var(--file-font-deep); }
+.file-type-icon--ebook { --file-icon-main: var(--file-ebook); --file-icon-deep: var(--file-ebook-deep); }
+.file-type-icon--disk { --file-icon-main: var(--file-disk); --file-icon-deep: var(--file-disk-deep); }
+.file-type-icon--database { --file-icon-main: var(--file-database); --file-icon-deep: var(--file-database-deep); }
 .file-type-icon__paper {
   fill: var(--file-icon-paper);
   stroke: color-mix(in srgb, var(--file-icon-deep) 68%, var(--border));

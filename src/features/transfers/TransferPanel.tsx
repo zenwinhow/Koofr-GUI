@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { FileTypeIcon } from '../../components/FileTypeIcon'
-import { formatBytes } from '../files/filePresentation'
+import { fileKindByName, formatBytes } from '../files/filePresentation'
 import type { RecoveryKind } from '../../types/backend'
 import type { FileKind, TransferItem } from '../../types/files'
 
@@ -69,14 +69,7 @@ interface ChartPoint {
 
 function fileKindForTransfer(item: TransferItem): FileKind {
   if (item.localKind === 'folder') return 'folder'
-  const extension = item.name.split('.').pop()?.toLocaleLowerCase('en-US') ?? ''
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(extension)) return 'archive'
-  if (['exe', 'msi', 'msix', 'appx', 'bat', 'cmd', 'ps1'].includes(extension)) return 'executable'
-  if (['xlsx', 'xls', 'ods'].includes(extension)) return 'xlsx'
-  if (extension === 'pdf') return 'pdf'
-  if (['docx', 'doc', 'odt', 'md', 'txt'].includes(extension)) return 'docx'
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(extension)) return 'image'
-  return 'file'
+  return fileKindByName(item.name)
 }
 
 function percentage(item: TransferItem) {
