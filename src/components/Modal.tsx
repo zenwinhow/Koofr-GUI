@@ -10,9 +10,19 @@ interface ModalProps {
   readonly onAction?: () => void
   readonly actionDisabled?: boolean
   readonly wide?: boolean
+  readonly extraWide?: boolean
 }
 
-export function Modal({ title, children, actionLabel, onClose, onAction, actionDisabled = false, wide = false }: ModalProps) {
+export function Modal({
+  title,
+  children,
+  actionLabel,
+  onClose,
+  onAction,
+  actionDisabled = false,
+  wide = false,
+  extraWide = false,
+}: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const onCloseRef = useRef(onClose)
@@ -51,7 +61,7 @@ export function Modal({ title, children, actionLabel, onClose, onAction, actionD
         onClick={() => onCloseRef.current()}
       />
       <section
-        className={`modal${wide ? ' modal--wide' : ''}`}
+        className={`modal${wide ? ' modal--wide' : ''}${extraWide ? ' modal--extra-wide' : ''}`}
       >
         <button ref={closeButtonRef} className="icon-button modal__close" type="button" aria-label="关闭" onClick={onClose}>
           <X size={18} />

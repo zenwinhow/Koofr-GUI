@@ -7,10 +7,18 @@
 ### Added
 - 文件图标大幅扩展覆盖面：新增视频（mp4、mkv、mov、avi、webm 等）、音频（mp3、flac、wav、ogg 等）、代码（ts/tsx、js、py、rs、go、java、c/cpp、sh、sql、yaml 等）、演示文稿（pptx/ppt/odp/key）、纯文本（txt、md、log、csv 等）、字体（ttf、otf、woff/woff2）、电子书（epub、mobi、azw3）、光盘映像（iso、img、vhd、vmdk）与数据库（sqlite、db、parquet）九类专属彩色图标
 - 图片、压缩包、可执行文件、表格与文档的识别扩展名同步补全（heic、avif、zst、apk、deb、xlsm、docm 等）
+- Koofr Vault 完整工作区：创建、导入/导出、原生 Safe Key 解锁、锁定、自动锁定、移除注册、解密浏览和文件操作
+- rclone crypt 兼容的 AES-EME 文件名与 XSalsa20-Poly1305 内容加密；加密上传可整文件恢复，密文下载支持 HTTP Range 字节续传
+- Vault / rclone golden vector、Unicode + salt、块边界、篡改拒绝和 WebView 无 Safe Key 输入覆盖
 
 ### Changed
 - 传输面板的文件类型识别改为复用 `fileKindByName`，与文件列表保持一致，不再维护两份扩展名表
 - `.ts` 后缀按视频（MPEG-TS）识别，TypeScript 源码以 `.tsx` 识别为代码
+- 传输面板只为具有恢复检查点的活动任务显示暂停按钮
+
+### Security
+- Vault Safe Key 只经过 Windows 原生凭据窗口和 Rust 内存；前端、日志、缓存、配置与传输检查点均不保存 Safe Key
+- Vault 文件操作通过短期不透明句柄在 Rust 侧重新解析并限制到已注册根目录，密文路径和 validator 不暴露给 WebView
 
 ## [1.5.0] - 2026-07-23
 

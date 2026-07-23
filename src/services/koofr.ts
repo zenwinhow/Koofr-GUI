@@ -17,6 +17,8 @@ import type {
   TrashList,
   CommandError,
   DownloadHistoryItem,
+  VaultDirectory,
+  VaultSummary,
 } from '../types/backend'
 import type { SplitUploadSettings } from '../types/files'
 
@@ -235,6 +237,91 @@ export const koofr = {
 
   deleteEntry(mountId: string, path: string) {
     return invoke<void>('delete_entry', { mountId, path })
+  },
+
+  listVaults() {
+    return invoke<VaultSummary[]>('list_vaults')
+  },
+
+  unlockVault(repoId: string) {
+    return invoke<VaultSummary>('unlock_vault', { repoId })
+  },
+
+  lockVault(repoId: string) {
+    return invoke<VaultSummary[]>('lock_vault', { repoId })
+  },
+
+  listVaultFiles(repoId: string, directoryId = 'root') {
+    return invoke<VaultDirectory>('list_vault_files', { repoId, directoryId })
+  },
+
+  createVaultFolder(repoId: string, parentId: string, name: string) {
+    return invoke<void>('create_vault_folder', { repoId, parentId, name })
+  },
+
+  renameVaultEntry(repoId: string, entryId: string, newName: string) {
+    return invoke<void>('rename_vault_entry', { repoId, entryId, newName })
+  },
+
+  relocateVaultEntry(repoId: string, entryId: string, destinationId: string, isMove: boolean) {
+    return invoke<void>('relocate_vault_entry', {
+      repoId,
+      entryId,
+      destinationId,
+      isMove,
+    })
+  },
+
+  deleteVaultEntries(repoId: string, entryIds: string[]) {
+    return invoke<void>('delete_vault_entries', { repoId, entryIds })
+  },
+
+  createVault(mountId: string, parentPath: string, name: string) {
+    return invoke<VaultSummary>('create_vault', { mountId, parentPath, name })
+  },
+
+  removeVault(repoId: string, confirmation: string) {
+    return invoke<VaultSummary[]>('remove_vault', { repoId, confirmation })
+  },
+
+  exportVaultRcloneConfig(repoId: string) {
+    return invoke<boolean>('export_vault_rclone_config', { repoId })
+  },
+
+  importVaultRcloneConfig() {
+    return invoke<VaultSummary[]>('import_vault_rclone_config')
+  },
+
+  uploadVaultFile(repoId: string, parentId: string, localPathGrant: string) {
+    const transferId = crypto.randomUUID()
+    return {
+      transferId,
+      result: invoke<TransferResult>('upload_vault_file', {
+        transferId,
+        repoId,
+        parentId,
+        localPathGrant,
+      }),
+    }
+  },
+
+  downloadVaultFile(
+    repoId: string,
+    entryId: string,
+    displayName: string,
+    localPathGrant: string,
+  ) {
+    const transferId = crypto.randomUUID()
+    return {
+      transferId,
+      result: invoke<TransferResult>('download_vault_file', {
+        transferId,
+        repoId,
+        entryId,
+        displayName,
+        localPathGrant,
+      }),
+    }
   },
 
   uploadFile(mountId: string, remoteDirectory: string, localPathGrant: string) {

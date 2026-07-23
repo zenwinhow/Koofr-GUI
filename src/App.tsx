@@ -15,6 +15,7 @@ import { SettingsPanel } from './features/settings/SettingsPanel'
 import { DownloadDestinationDialog } from './features/transfers/DownloadDestinationDialog'
 import { SplitUploadDialog } from './features/transfers/SplitUploadDialog'
 import { TransferPanel } from './features/transfers/TransferPanel'
+import { VaultDialog } from './features/vault/VaultDialog'
 import { countActiveDownloads, mergeTransferProgress } from './features/transfers/transferProgress'
 import { beginDownload } from './features/transfers/beginDownload'
 import {
@@ -36,6 +37,7 @@ import type {
   TrashItem,
 } from './types/backend'
 import type { SplitUploadSettings, TransferItem, UploadMode } from './types/files'
+import type { VaultTransferSpec } from './types/vault'
 
 type ModalKind = 'settings' | 'theme' | 'vault' | 'download' | 'splitUpload' | 'share' | 'createFolder' | 'rename' | 'delete' | 'emptyTrash' | null
 type AuthState = 'checking' | 'signedOut' | 'signingIn' | 'signedIn'
@@ -392,6 +394,54 @@ function App() {
     } catch (error) {
       showNotice(commandErrorMessage(error, '暂时无法退出登录，请重试。'))
     }
+  }
+
+  const startVaultTransfer = (transfer: VaultTransferSpec) => {
+    const startedAt = Date.now()
+    setTransfers((current) => [{
+      id: transfer.transferId,
+      name: transfer.name,
+      direction: transfer.direction,
+      state: 'running',
+      bytesTransferred: 0,
+      totalBytes: transfer.totalBytes,
+      localKind: 'file',
+      recoveryKind: transfer.recoveryKind,
+      remotePath: null,
+      localPath: transfer.localPath,
+      startedAt,
+      finishedAt: null,
+      speedSamples: [{ recordedAt: startedAt, bytesTransferred: 0 }],
+    }, ...current])
+    setTransferVisible(true)
+
+    void transfer.result
+      .then((result) => {
+        setTransfers((current) => current.map((item) => item.id === transfer.transferId
+          ? {
+              ...item,
+              state: 'completed',
+              bytesTransferred: result.bytesTransferred,
+              totalBytes: item.totalBytes ?? result.bytesTransferred,
+              finishedAt: Date.now(),
+            }
+          : item))
+      })
+      .catch((error) => {
+        setTransfers((current) => current.map((item) => item.id === transfer.transferId
+          ? {
+              ...item,
+              state: isCommandErrorCode(error, 'transfer_paused')
+                ? 'paused'
+                : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
+              finishedAt: null,
+            }
+          : item))
+        showNotice(commandErrorMessage(
+          error,
+          transfer.direction === 'upload' ? '加密上传失败，请稍后重试。' : '加密下载失败，请稍后重试。',
+        ))
+      })
   }
 
   const startSelectedUpload = async (
@@ -1042,9 +1092,13 @@ function App() {
       ) : null}
 
       {authState === 'signedIn' && modalKind === 'vault' ? (
-        <Modal title="私人保险箱已锁定" actionLabel="知道了" onClose={() => setModalKind(null)}>
-          <p>保险箱解锁需要由 Rust 后端安全处理。此 UI 不会在浏览器状态中读取或保存 Safe Key。</p>
-        </Modal>
+        <VaultDialog
+          mountId={workspace.activeMountId}
+          parentPath={workspace.path}
+          onClose={() => setModalKind(null)}
+          onNotice={showNotice}
+          onTransferStarted={startVaultTransfer}
+        />
       ) : null}
 
       {authState === 'signedIn' && modalKind === 'settings' ? (

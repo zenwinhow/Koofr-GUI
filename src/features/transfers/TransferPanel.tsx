@@ -328,7 +328,7 @@ export function TransferPanel({
                 ) : null}
               </div>
               <div className="transfer-item__trailing">
-                {active ? (
+                {active && item.recoveryKind ? (
                   <button
                     className="row-action"
                     type="button"
