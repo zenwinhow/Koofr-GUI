@@ -20,8 +20,9 @@ use super::{
     checkpoint::{TransferCheckpoint, TransferCheckpointStore, UploadCheckpoint},
     manager::TransferManager,
     model::{
-        NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
-        emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
+        NetworkRetryPolicy, NetworkRetryRequest, TransferDirection, TransferResult, TransferState,
+        emit_progress, emit_terminal, normalize_interruption, should_retry_network,
+        wait_for_network_retry,
     },
 };
 
@@ -129,16 +130,16 @@ async fn run_upload(
             break result;
         }
         retries_completed = retries_completed.saturating_add(1);
-        if let Err(error) = wait_for_network_retry(
-            &app,
-            &cancel,
-            &transfer_id,
-            TransferDirection::Upload,
-            retries_completed,
-            progress.load(Ordering::Relaxed),
-            Some(total),
-            retry_policy,
-        )
+        if let Err(error) = wait_for_network_retry(NetworkRetryRequest {
+            app: &app,
+            cancel: &cancel,
+            transfer_id: &transfer_id,
+            direction: TransferDirection::Upload,
+            retry_attempt: retries_completed,
+            bytes_transferred: progress.load(Ordering::Relaxed),
+            total_bytes: Some(total),
+            policy: retry_policy,
+        })
         .await
         {
             break Err(error);

@@ -17,8 +17,9 @@ use crate::{
     file_ops::{MountId, RemoteName, RemotePath, safe_suggested_file_name},
     koofr_api::KoofrApi,
     transfer::{
-        NetworkRetryPolicy, TransferDirection, TransferManager, TransferResult, TransferState,
-        emit_progress, emit_terminal, should_retry_network, wait_for_network_retry,
+        NetworkRetryPolicy, NetworkRetryRequest, TransferDirection, TransferManager,
+        TransferResult, TransferState, emit_progress, emit_terminal, should_retry_network,
+        wait_for_network_retry,
     },
 };
 
@@ -134,16 +135,16 @@ pub async fn download_folder(
             break result;
         }
         retries_completed = retries_completed.saturating_add(1);
-        if let Err(error) = wait_for_network_retry(
-            &context.app,
-            &cancel,
-            &request.transfer_id,
-            TransferDirection::Download,
-            retries_completed,
-            progress.load(Ordering::Relaxed),
-            None,
-            context.retry_policy,
-        )
+        if let Err(error) = wait_for_network_retry(NetworkRetryRequest {
+            app: &context.app,
+            cancel: &cancel,
+            transfer_id: &request.transfer_id,
+            direction: TransferDirection::Download,
+            retry_attempt: retries_completed,
+            bytes_transferred: progress.load(Ordering::Relaxed),
+            total_bytes: None,
+            policy: context.retry_policy,
+        })
         .await
         {
             break Err(error);

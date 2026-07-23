@@ -18,8 +18,9 @@ pub use checkpoint::{ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
 pub use manager::TransferManager;
 pub use model::{
-    NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
-    emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
+    NetworkRetryPolicy, NetworkRetryRequest, TransferDirection, TransferResult, TransferState,
+    emit_progress, emit_terminal, normalize_interruption, should_retry_network,
+    wait_for_network_retry,
 };
 pub use split_upload::{
     SplitTransferRuntime, SplitUploadRequest, resume_split_upload, upload_split,

@@ -171,16 +171,28 @@ pub fn should_retry_network<T>(
     policy.enabled() && within_limit && matches!(result, Err(AppError::Network(_)))
 }
 
-pub async fn wait_for_network_retry(
-    app: &AppHandle,
-    cancel: &CancellationToken,
-    transfer_id: &str,
-    direction: TransferDirection,
-    retry_attempt: u32,
-    bytes_transferred: u64,
-    total_bytes: Option<u64>,
-    policy: NetworkRetryPolicy,
-) -> Result<(), AppError> {
+pub struct NetworkRetryRequest<'a> {
+    pub app: &'a AppHandle,
+    pub cancel: &'a CancellationToken,
+    pub transfer_id: &'a str,
+    pub direction: TransferDirection,
+    pub retry_attempt: u32,
+    pub bytes_transferred: u64,
+    pub total_bytes: Option<u64>,
+    pub policy: NetworkRetryPolicy,
+}
+
+pub async fn wait_for_network_retry(request: NetworkRetryRequest<'_>) -> Result<(), AppError> {
+    let NetworkRetryRequest {
+        app,
+        cancel,
+        transfer_id,
+        direction,
+        retry_attempt,
+        bytes_transferred,
+        total_bytes,
+        policy,
+    } = request;
     let delay_seconds = policy.interval_seconds();
     let mut fields = Map::new();
     fields.insert("retryAttempt".to_owned(), Value::from(retry_attempt));

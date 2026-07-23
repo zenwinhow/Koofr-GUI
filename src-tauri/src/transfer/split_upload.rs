@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::{
-    NetworkRetryPolicy, TransferDirection, TransferResult, TransferState,
+    NetworkRetryPolicy, NetworkRetryRequest, TransferDirection, TransferResult, TransferState,
     checkpoint::{SplitUploadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     emit_progress, emit_terminal,
     manager::TransferManager,
@@ -149,16 +149,16 @@ async fn run_registered(
             break result;
         }
         retries_completed = retries_completed.saturating_add(1);
-        if let Err(error) = wait_for_network_retry(
-            &runtime.app,
-            &cancel,
-            &checkpoint.transfer_id,
-            TransferDirection::Upload,
-            retries_completed,
-            committed_bytes(&checkpoint),
-            Some(checkpoint.expected_size),
-            runtime.retry_policy,
-        )
+        if let Err(error) = wait_for_network_retry(NetworkRetryRequest {
+            app: &runtime.app,
+            cancel: &cancel,
+            transfer_id: &checkpoint.transfer_id,
+            direction: TransferDirection::Upload,
+            retry_attempt: retries_completed,
+            bytes_transferred: committed_bytes(&checkpoint),
+            total_bytes: Some(checkpoint.expected_size),
+            policy: runtime.retry_policy,
+        })
         .await
         {
             break Err(error);
@@ -216,16 +216,16 @@ async fn prepare_new_package(
             return result;
         }
         retries_completed = retries_completed.saturating_add(1);
-        wait_for_network_retry(
-            &runtime.app,
+        wait_for_network_retry(NetworkRetryRequest {
+            app: &runtime.app,
             cancel,
-            &checkpoint.transfer_id,
-            TransferDirection::Upload,
-            retries_completed,
-            0,
-            Some(checkpoint.expected_size),
-            runtime.retry_policy,
-        )
+            transfer_id: &checkpoint.transfer_id,
+            direction: TransferDirection::Upload,
+            retry_attempt: retries_completed,
+            bytes_transferred: 0,
+            total_bytes: Some(checkpoint.expected_size),
+            policy: runtime.retry_policy,
+        })
         .await?;
     }
 }

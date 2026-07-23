@@ -18,8 +18,9 @@ use super::{
     checkpoint::{DownloadCheckpoint, TransferCheckpoint, TransferCheckpointStore},
     manager::TransferManager,
     model::{
-        NetworkRetryPolicy, TransferDirection, TransferResult, TransferState, emit_progress,
-        emit_terminal, normalize_interruption, should_retry_network, wait_for_network_retry,
+        NetworkRetryPolicy, NetworkRetryRequest, TransferDirection, TransferResult, TransferState,
+        emit_progress, emit_terminal, normalize_interruption, should_retry_network,
+        wait_for_network_retry,
     },
     part::{open_partial, partial_length, truncate_partial, validate_checkpoint_paths},
     range::{ResponseMode, response_mode},
@@ -93,16 +94,16 @@ async fn run_download(
             break result;
         }
         retries_completed = retries_completed.saturating_add(1);
-        if let Err(error) = wait_for_network_retry(
-            &app,
-            &cancel,
-            &transfer_id,
-            TransferDirection::Download,
-            retries_completed,
-            progress.load(Ordering::Relaxed),
-            Some(checkpoint.expected_size),
-            retry_policy,
-        )
+        if let Err(error) = wait_for_network_retry(NetworkRetryRequest {
+            app: &app,
+            cancel: &cancel,
+            transfer_id: &transfer_id,
+            direction: TransferDirection::Download,
+            retry_attempt: retries_completed,
+            bytes_transferred: progress.load(Ordering::Relaxed),
+            total_bytes: Some(checkpoint.expected_size),
+            policy: retry_policy,
+        })
         .await
         {
             break Err(error);
