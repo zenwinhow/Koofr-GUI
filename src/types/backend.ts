@@ -128,6 +128,26 @@ export interface TransferProgress {
   totalBytes: number | null
 }
 
+export interface DownloadSpeedSample {
+  readonly recordedAt: number
+  readonly bytesTransferred: number
+}
+
+export interface DownloadHistoryItem {
+  readonly transferId: string
+  readonly name: string
+  readonly state: TransferState
+  readonly bytesTransferred: number
+  readonly totalBytes: number | null
+  readonly localKind: 'file' | 'folder'
+  readonly recoveryKind: RecoveryKind | null
+  readonly remotePath: string
+  readonly localPath: string
+  readonly startedAt: number
+  readonly finishedAt: number | null
+  readonly speedSamples: DownloadSpeedSample[]
+}
+
 export interface TransferResult {
   transferId: string
   bytesTransferred: number
@@ -146,4 +166,5 @@ export interface ResumableTransfer {
 export interface LocalFileSelection {
   readonly grantId: string
   readonly fileName: string
+  readonly localPath: string | null
 }

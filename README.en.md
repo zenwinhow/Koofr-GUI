@@ -189,6 +189,7 @@ App data lives under the current Windows user's local data directory (`identifie
 %LOCALAPPDATA%\net.koofr.desktop.gui\
 ├─ settings.json                # app settings
 ├─ transfer-checkpoints.json    # resumable transfer checkpoints
+├─ download-history.json        # account-scoped download history, locations, and bounded speed samples
 ├─ cache/metadata-cache.json    # default disk cache location (configurable)
 └─ logs/koofr-gui*.jsonl       # redacted diagnostic logs (configurable)
 ```

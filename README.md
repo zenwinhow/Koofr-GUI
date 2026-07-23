@@ -190,6 +190,7 @@ npm run build:installer      # 显式生成 NSIS 安装包
 %LOCALAPPDATA%\net.koofr.desktop.gui\
 ├─ settings.json                # 应用设置
 ├─ transfer-checkpoints.json    # 传输恢复检查点
+├─ download-history.json        # 按账户隔离的下载历史、文件位置与限量速度采样
 ├─ cache/metadata-cache.json    # 默认元数据缓存位置（可配置）
 └─ logs/koofr-gui*.jsonl       # 默认脱敏诊断日志位置（可配置）
 ```

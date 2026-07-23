@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio_util::sync::CancellationToken;
@@ -7,14 +7,14 @@ use crate::{AppState, error::AppError, koofr_api::FileInfo, settings::NetworkRet
 
 pub const TRANSFER_EVENT: &str = "koofr://transfer-progress";
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferDirection {
     Upload,
     Download,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferState {
     Running,
@@ -92,6 +92,12 @@ pub fn emit_progress(
     bytes_transferred: u64,
     total_bytes: Option<u64>,
 ) {
+    app.state::<AppState>().download_history.record_progress(
+        transfer_id,
+        state,
+        bytes_transferred,
+        total_bytes,
+    );
     let _ = app.emit(
         TRANSFER_EVENT,
         TransferProgress {

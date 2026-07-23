@@ -15,7 +15,7 @@ import { SettingsPanel } from './features/settings/SettingsPanel'
 import { DownloadDestinationDialog } from './features/transfers/DownloadDestinationDialog'
 import { SplitUploadDialog } from './features/transfers/SplitUploadDialog'
 import { TransferPanel } from './features/transfers/TransferPanel'
-import { mergeTransferProgress } from './features/transfers/transferProgress'
+import { countActiveDownloads, mergeTransferProgress } from './features/transfers/transferProgress'
 import { beginDownload } from './features/transfers/beginDownload'
 import {
   commandErrorMessage,
@@ -78,9 +78,7 @@ function App() {
   const collections = useKoofrCollections(authState === 'signedIn', activeItem)
   const workspaceLocation = useRef({ activeMountId: '', path: '/' })
   const activeMount = workspace.mounts.find((mount) => mount.id === workspace.activeMountId)
-  const runningTransfers = transfers.filter((transfer) => (
-    transfer.state === 'running' || transfer.state === 'retrying'
-  )).length
+  const activeDownloadCount = countActiveDownloads(transfers)
 
   useEffect(() => {
     workspaceLocation.current = {
@@ -140,24 +138,53 @@ function App() {
   useEffect(() => {
     if (authState !== 'signedIn') return
     let active = true
-    void koofr.listResumableTransfers()
-      .then((resumable) => {
+    void Promise.all([koofr.listDownloadHistory(), koofr.listResumableTransfers()])
+      .then(([history, resumable]) => {
         if (!active) return
         setTransfers((current) => {
           const existingIds = new Set(current.map((item) => item.id))
-          const restored = resumable
+          const cached = history
             .filter((item) => !existingIds.has(item.transferId))
             .map((item): TransferItem => ({
               id: item.transferId,
               name: item.name,
+              direction: 'download',
+              state: item.state,
+              bytesTransferred: item.bytesTransferred,
+              totalBytes: item.totalBytes,
+              localKind: item.localKind,
+              recoveryKind: item.recoveryKind,
+              remotePath: item.remotePath,
+              localPath: item.localPath,
+              startedAt: item.startedAt,
+              finishedAt: item.finishedAt,
+              speedSamples: item.speedSamples,
+            }))
+          const cachedById = new Map(cached.map((item) => [item.id, item]))
+          const restored = resumable
+            .filter((item) => !existingIds.has(item.transferId))
+            .map((item): TransferItem => ({
+              ...cachedById.get(item.transferId),
+              id: item.transferId,
+              name: cachedById.get(item.transferId)?.name ?? item.name,
               direction: item.direction,
               state: 'paused',
               bytesTransferred: item.bytesTransferred,
               totalBytes: item.totalBytes,
-              localKind: 'file',
+              localKind: cachedById.get(item.transferId)?.localKind ?? 'file',
               recoveryKind: item.recoveryKind,
+              remotePath: cachedById.get(item.transferId)?.remotePath ?? null,
+              localPath: cachedById.get(item.transferId)?.localPath ?? null,
+              startedAt: cachedById.get(item.transferId)?.startedAt ?? null,
+              finishedAt: cachedById.get(item.transferId)?.finishedAt ?? null,
+              speedSamples: cachedById.get(item.transferId)?.speedSamples ?? [],
             }))
-          return [...restored, ...current]
+          const resumableIds = new Set(restored.map((item) => item.id))
+          return [
+            ...restored,
+            ...cached.filter((item) => !resumableIds.has(item.id)),
+            ...current,
+          ].sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))
         })
       })
       .catch((error) => {
@@ -376,6 +403,7 @@ function App() {
     const transfer = splitSettings
       ? koofr.uploadSplitFile(uploadMountId, uploadPath, selection.grantId, splitSettings)
       : koofr.uploadFile(uploadMountId, uploadPath, selection.grantId)
+    const startedAt = Date.now()
     setTransfers((current) => [{
       id: transfer.transferId,
       name: selection.fileName,
@@ -385,6 +413,11 @@ function App() {
       totalBytes: null,
       localKind: 'file',
       recoveryKind: splitSettings ? 'chunk_resume' : 'restart',
+      remotePath: null,
+      localPath: null,
+      startedAt,
+      finishedAt: null,
+      speedSamples: [{ recordedAt: startedAt, bytesTransferred: 0 }],
     }, ...current])
     setTransferVisible(true)
 
@@ -409,6 +442,7 @@ function App() {
           state: 'completed',
           bytesTransferred: result.bytesTransferred,
           totalBytes: item.totalBytes ?? result.bytesTransferred,
+          finishedAt: Date.now(),
         }
       : item))
     if (
@@ -455,6 +489,7 @@ function App() {
     targetDirectory: string,
   ) => {
     const transfer = await beginDownload(file, mountId, targetDirectory)
+    const startedAt = Date.now()
     setTransfers((current) => [{
       id: transfer.transferId,
       name: file.name,
@@ -464,6 +499,11 @@ function App() {
       totalBytes: transfer.localKind === 'file' && file.size > 0 ? file.size : null,
       localKind: transfer.localKind,
       recoveryKind: transfer.localKind === 'file' ? 'byte_resume' : null,
+      remotePath: file.path,
+      localPath: transfer.localPath,
+      startedAt,
+      finishedAt: null,
+      speedSamples: [{ recordedAt: startedAt, bytesTransferred: 0 }],
     }, ...current])
     setTransferVisible(true)
 
@@ -476,6 +516,7 @@ function App() {
               state: 'completed',
               bytesTransferred: result.bytesTransferred,
               totalBytes: item.totalBytes ?? result.bytesTransferred,
+              finishedAt: Date.now(),
             }
           : item))
       } catch (error) {
@@ -485,6 +526,7 @@ function App() {
               state: isCommandErrorCode(error, 'transfer_paused')
                 ? 'paused'
                 : isCommandErrorCode(error, 'cancelled') ? 'cancelled' : 'failed',
+              finishedAt: null,
             }
           : item))
         showNotice(commandErrorMessage(error, '下载失败，请稍后重试。'))
@@ -574,8 +616,15 @@ function App() {
   }
 
   const resumeTransfer = async (transferId: string) => {
+    const resumedAt = Date.now()
     setTransfers((current) => current.map((item) => item.id === transferId
-      ? { ...item, state: 'running' }
+      ? {
+          ...item,
+          state: 'running',
+          speedSamples: item.speedSamples.length > 0
+            ? item.speedSamples
+            : [{ recordedAt: resumedAt, bytesTransferred: item.bytesTransferred }],
+        }
       : item))
     setTransferVisible(true)
     try {
@@ -586,6 +635,7 @@ function App() {
             state: 'completed',
             bytesTransferred: result.bytesTransferred,
             totalBytes: item.totalBytes ?? result.bytesTransferred,
+            finishedAt: Date.now(),
           }
         : item))
       await workspace.refresh()
@@ -594,6 +644,7 @@ function App() {
         ? {
             ...item,
             state: isCommandErrorCode(error, 'transfer_paused') ? 'paused' : 'failed',
+            finishedAt: null,
           }
         : item))
       showNotice(commandErrorMessage(error, '无法继续这个传输任务。'))
@@ -609,13 +660,18 @@ function App() {
     }
   }
 
-  const clearFinishedTransfers = () => {
-    setTransfers((current) => current.filter((item) => (
-      item.state === 'running'
-      || item.state === 'retrying'
-      || item.state === 'paused'
-      || (item.state === 'failed' && item.recoveryKind !== null)
-    )))
+  const clearFinishedTransfers = async () => {
+    try {
+      await koofr.clearFinishedDownloadHistory()
+      setTransfers((current) => current.filter((item) => (
+        item.state === 'running'
+        || item.state === 'retrying'
+        || item.state === 'paused'
+        || (item.state === 'failed' && item.recoveryKind !== null)
+      )))
+    } catch (error) {
+      showNotice(commandErrorMessage(error, '无法清除下载历史。'))
+    }
   }
 
   const openDownloadedFile = async (transferId: string) => {
@@ -870,19 +926,19 @@ function App() {
             onDiscard={(transferId) => void discardResumableTransfer(transferId)}
             onOpenFile={(transferId) => void openDownloadedFile(transferId)}
             onOpenFolder={(transferId) => void openDownloadedFolder(transferId)}
-            onClearFinished={clearFinishedTransfers}
+            onClearFinished={() => void clearFinishedTransfers()}
           />
           {!transferVisible ? (
             <button
               className="transfer-reopen"
               type="button"
-              aria-label={transfers.length > 0 ? `打开下载界面，共 ${transfers.length} 个任务` : '打开下载界面'}
-              title="打开下载界面"
+              aria-label={activeDownloadCount > 0 ? `打开传输界面，${activeDownloadCount} 项正在下载` : '打开传输界面'}
+              title="打开传输界面"
               onClick={() => setTransferVisible(true)}
             >
               <ArrowDownToLine size={23} />
-              {transfers.length > 0 ? (
-                <span>{runningTransfers || transfers.length}</span>
+              {activeDownloadCount > 0 ? (
+                <span>{activeDownloadCount}</span>
               ) : null}
             </button>
           ) : null}

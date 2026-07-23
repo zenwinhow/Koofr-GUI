@@ -6,6 +6,7 @@ interface StartedDownload {
   readonly transferId: string
   readonly result: Promise<TransferResult>
   readonly localKind: 'file' | 'folder'
+  readonly localPath: string
 }
 
 export async function beginDownload(
@@ -18,6 +19,7 @@ export async function beginDownload(
     return {
       ...koofr.downloadFolder(mountId, file.path, selection.grantId),
       localKind: 'folder',
+      localPath: selection.localPath ?? selection.fileName,
     }
   }
 
@@ -25,5 +27,6 @@ export async function beginDownload(
   return {
     ...koofr.downloadFile(mountId, file.path, selection.grantId),
     localKind: 'file',
+    localPath: selection.localPath ?? selection.fileName,
   }
 }

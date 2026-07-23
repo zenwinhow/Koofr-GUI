@@ -5,6 +5,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppState,
+    download_history::{DownloadLocalKind, NewDownloadHistoryItem},
     error::{AppError, CommandError},
     file_ops::{
         LocalDownloadPath, LocalUploadPath, MountId, RemoteName, RemotePath,
@@ -776,8 +777,27 @@ pub async fn download_file(
         .take_download(&local_path_grant)
         .map_err(CommandError::from)?;
     let completed_path = selected_path.clone();
+    let owner_id = transfer::current_owner(&state.api)
+        .await
+        .map_err(CommandError::from)?;
+    let history_name = remote_path
+        .file_name()
+        .map_err(CommandError::from)?
+        .to_owned();
     let local_path = LocalDownloadPath::from_selected(selected_path)
         .await
+        .map_err(CommandError::from)?;
+    state
+        .download_history
+        .start(NewDownloadHistoryItem {
+            transfer_id: &transfer_id,
+            owner_id: &owner_id,
+            name: &history_name,
+            remote_path: remote_path.as_str(),
+            local_path: &completed_path,
+            local_kind: DownloadLocalKind::File,
+            recovery_kind: Some(transfer::RecoveryKind::ByteResume),
+        })
         .map_err(CommandError::from)?;
     let retry_policy =
         transfer::NetworkRetryPolicy::from(state.settings.network_retry_settings().await);
@@ -806,10 +826,19 @@ pub async fn open_downloaded_file(
     state: State<'_, AppState>,
     transfer_id: String,
 ) -> CommandResult<()> {
-    let path = state
-        .local_access
-        .completed_download(&transfer_id)
-        .map_err(CommandError::from)?;
+    let path = match state.local_access.completed_download(&transfer_id) {
+        Ok(path) => path,
+        Err(AppError::NotFound) => {
+            let owner_id = transfer::current_owner(&state.api)
+                .await
+                .map_err(CommandError::from)?;
+            state
+                .download_history
+                .completed_path(&owner_id, &transfer_id)
+                .map_err(CommandError::from)?
+        }
+        Err(error) => return Err(CommandError::from(error)),
+    };
     let metadata = tokio::fs::metadata(&path)
         .await
         .map_err(|_| CommandError::from(AppError::LocalOpen))?;
@@ -824,10 +853,19 @@ pub async fn open_downloaded_folder(
     state: State<'_, AppState>,
     transfer_id: String,
 ) -> CommandResult<()> {
-    let path = state
-        .local_access
-        .completed_download(&transfer_id)
-        .map_err(CommandError::from)?;
+    let path = match state.local_access.completed_download(&transfer_id) {
+        Ok(path) => path,
+        Err(AppError::NotFound) => {
+            let owner_id = transfer::current_owner(&state.api)
+                .await
+                .map_err(CommandError::from)?;
+            state
+                .download_history
+                .completed_path(&owner_id, &transfer_id)
+                .map_err(CommandError::from)?
+        }
+        Err(error) => return Err(CommandError::from(error)),
+    };
     let parent = path
         .parent()
         .ok_or_else(|| CommandError::from(AppError::LocalOpen))?;

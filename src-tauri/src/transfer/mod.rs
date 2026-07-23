@@ -14,7 +14,7 @@ mod split_support;
 mod split_upload;
 mod upload;
 
-pub use checkpoint::{ResumableTransfer, TransferCheckpointStore};
+pub use checkpoint::{RecoveryKind, ResumableTransfer, TransferCheckpointStore};
 pub use download::{download, resume_download};
 pub use manager::TransferManager;
 pub use model::{

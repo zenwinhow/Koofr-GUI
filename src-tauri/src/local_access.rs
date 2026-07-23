@@ -19,6 +19,7 @@ enum LocalPathGrant {
 pub struct LocalFileSelection {
     pub grant_id: String,
     pub file_name: String,
+    pub local_path: Option<String>,
 }
 
 #[derive(Default)]
@@ -52,6 +53,11 @@ impl LocalAccessManager {
             .map(str::to_owned)
             .ok_or(AppError::InvalidInput("selected local file name"))?;
         let grant_id = uuid::Uuid::new_v4().to_string();
+        let local_path = matches!(
+            &grant,
+            LocalPathGrant::Download(_) | LocalPathGrant::DownloadDirectory(_)
+        )
+        .then(|| path.to_string_lossy().into_owned());
         let mut grants = self.grants.lock().expect("local path grant store poisoned");
         if grants.len() >= MAX_PENDING_GRANTS {
             grants.clear();
@@ -60,6 +66,7 @@ impl LocalAccessManager {
         Ok(LocalFileSelection {
             grant_id,
             file_name,
+            local_path,
         })
     }
 

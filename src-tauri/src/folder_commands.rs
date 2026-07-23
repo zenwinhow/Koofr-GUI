@@ -3,11 +3,12 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::{
     AppState,
+    download_history::{DownloadLocalKind, NewDownloadHistoryItem},
     error::{AppError, CommandError},
     file_ops::{MountId, RemoteName, RemotePath},
     folder_download::{self, FolderDownloadContext, FolderDownloadRequest, FolderDownloadTarget},
     local_access::LocalFileSelection,
-    transfer::{NetworkRetryPolicy, TransferResult},
+    transfer::{self, NetworkRetryPolicy, TransferResult},
 };
 
 type CommandResult<T> = Result<T, CommandError>;
@@ -67,8 +68,27 @@ pub async fn download_folder(
         .take_download_directory(&local_path_grant)
         .map_err(CommandError::from)?;
     let completed_path = selected_path.clone();
+    let owner_id = transfer::current_owner(&state.api)
+        .await
+        .map_err(CommandError::from)?;
+    let history_name = remote_path
+        .file_name()
+        .map_err(CommandError::from)?
+        .to_owned();
     let target = FolderDownloadTarget::from_selected(selected_path)
         .await
+        .map_err(CommandError::from)?;
+    state
+        .download_history
+        .start(NewDownloadHistoryItem {
+            transfer_id: &transfer_id,
+            owner_id: &owner_id,
+            name: &history_name,
+            remote_path: remote_path.as_str(),
+            local_path: &completed_path,
+            local_kind: DownloadLocalKind::Folder,
+            recovery_kind: None,
+        })
         .map_err(CommandError::from)?;
     let result = folder_download::download_folder(
         FolderDownloadContext {

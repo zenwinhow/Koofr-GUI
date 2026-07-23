@@ -16,6 +16,7 @@ import type {
   TrashItem,
   TrashList,
   CommandError,
+  DownloadHistoryItem,
 } from '../types/backend'
 import type { SplitUploadSettings } from '../types/files'
 
@@ -307,6 +308,14 @@ export const koofr = {
 
   listResumableTransfers() {
     return invoke<ResumableTransfer[]>('list_resumable_transfers')
+  },
+
+  listDownloadHistory() {
+    return invoke<DownloadHistoryItem[]>('list_download_history')
+  },
+
+  clearFinishedDownloadHistory() {
+    return invoke<number>('clear_finished_download_history')
   },
 
   resumeTransfer(transferId: string) {

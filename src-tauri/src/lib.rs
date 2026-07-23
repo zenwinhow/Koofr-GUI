@@ -1,5 +1,6 @@
 mod commands;
 mod credential_manager;
+mod download_history;
 mod error;
 mod file_ops;
 mod folder_commands;
@@ -16,6 +17,7 @@ mod transfer;
 mod transfer_commands;
 
 use credential_manager::CredentialManager;
+use download_history::DownloadHistoryStore;
 use koofr_api::KoofrApi;
 use local_access::LocalAccessManager;
 use logging::{AppLogger, LogConfig};
@@ -27,6 +29,7 @@ use transfer::{TransferCheckpointStore, TransferManager};
 pub struct AppState {
     api: KoofrApi,
     local_access: LocalAccessManager,
+    download_history: DownloadHistoryStore,
     transfers: TransferManager,
     transfer_checkpoints: TransferCheckpointStore,
     settings: SettingsStore,
@@ -67,6 +70,9 @@ pub fn run() {
             app.manage(AppState {
                 api: KoofrApi::production()?,
                 local_access: LocalAccessManager::default(),
+                download_history: DownloadHistoryStore::load(
+                    data_dir.join("download-history.json"),
+                ),
                 transfers: TransferManager::default(),
                 transfer_checkpoints: TransferCheckpointStore::load(
                     data_dir.join("transfer-checkpoints.json"),
@@ -122,6 +128,8 @@ pub fn run() {
             commands::cancel_transfer,
             commands::pause_transfer,
             transfer_commands::list_resumable_transfers,
+            transfer_commands::list_download_history,
+            transfer_commands::clear_finished_download_history,
             transfer_commands::resume_transfer,
             transfer_commands::discard_resumable_transfer,
         ])

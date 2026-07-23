@@ -26,4 +26,14 @@ export interface TransferItem {
   readonly totalBytes: number | null
   readonly localKind: 'file' | 'folder'
   readonly recoveryKind: RecoveryKind | null
+  readonly remotePath: string | null
+  readonly localPath: string | null
+  readonly startedAt: number | null
+  readonly finishedAt: number | null
+  readonly speedSamples: readonly TransferSpeedSample[]
+}
+
+export interface TransferSpeedSample {
+  readonly recordedAt: number
+  readonly bytesTransferred: number
 }

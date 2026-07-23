@@ -355,6 +355,7 @@ pub enum AppError {
 %LOCALAPPDATA%\net.koofr.desktop.gui\
 ├─ settings.json                # AppSettings（下载、缓存和日志策略等）
 ├─ transfer-checkpoints.json    # TransferCheckpointStore（可恢复任务）
+├─ download-history.json        # 按账户隔离的下载历史、目标位置与限量速度采样
 ├─ cache/metadata-cache.json    # 默认磁盘缓存位置（可配置）
 └─ logs/koofr-gui*.jsonl       # 默认诊断日志位置（可配置）
 ```
