@@ -2,17 +2,20 @@
 
 格式按 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号按 [SemVer](https://semver.org/spec/v2.0.0.html)。
 
+## [1.6.1] - 2026-07-24
+
+### Added
+- 应用工作目录选择，可在下次启动前选择全量迁移设置、传输状态、下载历史、缓存和日志
+
+### Changed
+- 缓存与日志固定收纳到应用工作目录；移除各自的路径选择，保留缓存策略和原有日志级别、保留期、轮转、占用与清理配置。
+
 ## [1.6.0] - 2026-07-23
 
 ### Added
 - Koofr Vault 完整工作区：创建、导入/导出、原生 Safe Key 解锁、锁定、自动锁定、移除注册、解密浏览和文件操作
 - 使用 [Koofr Vault](https://github.com/koofr/vault) 提供的 `vault-crypto` 实现 rclone crypt 兼容的 AES-EME 文件名与 XSalsa20-Poly1305 内容加密；加密上传可整文件恢复，密文下载支持 HTTP Range 字节续传
 - Vault / rclone golden vector、Unicode + salt、块边界、篡改拒绝和 WebView 无 Safe Key 输入覆盖
-- 应用工作目录选择，可在下次启动前选择全量迁移设置、传输状态、下载历史、缓存和日志
-
-### Changed
-- 缓存与日志固定收纳到应用工作目录；移除各自的路径选择，保留缓存策略和原有日志级别、保留期、轮转、占用与清理配置
-
 ### Security
 - Vault Safe Key 只经过 Windows 原生凭据窗口和 Rust 内存；前端、日志、缓存、配置与传输检查点均不保存 Safe Key
 - Vault 文件操作通过短期不透明句柄在 Rust 侧重新解析并限制到已注册根目录，密文路径和 validator 不暴露给 WebView
