@@ -9,8 +9,9 @@
 - `src/commands.rs`、`src/vault_commands.rs`：暴露给 WebView 的窄接口；Vault 命令只接收注册 ID 和短期不透明句柄。
 - `src/crypto/`、`src/vault_core/`：官方 `koofr/vault` 加密引擎边界、Vault 解锁会话、不透明路径句柄和自动锁定。
 - `src/credential_manager.rs`：用户选了保存密码的话，把应用专用密码写到 Windows 凭据管理器里。密码不会出现在普通配置中。
-- `src/settings.rs`、`src/metadata_cache.rs`：保存非敏感设置，为挂载点、目录、最近文件、共享和回收站提供按账户隔离、位置可配置的 TTL 缓存。
-- `src/logging.rs`：后台写入结构化 JSONL 诊断日志，支持级别过滤、大小轮转、保留期限、运行时切换目录和清理。
+- `src/settings.rs`、`src/metadata_cache.rs`：保存非敏感设置，为挂载点、目录、最近文件、共享和回收站提供按账户隔离的 TTL 缓存。
+- `src/work_directory.rs`：保存工作目录定位记录，在启动早期执行可恢复的全量目录迁移。
+- `src/logging.rs`：后台写入结构化 JSONL 诊断日志，支持级别过滤、大小轮转、保留期限和清理。
 
 ## 会话和安全边界
 
@@ -27,14 +28,16 @@
 
 会话令牌只在内存里待着。用户勾了"保存密码"，应用专用密码由 Windows Credential Manager 保护，下次启动时由 Rust 后端读出来重新认证。OAuth、公版应用注册和令牌刷新等后续认证里程碑确认后再做。
 
-文件元数据缓存默认只存在内存里。用户可以在设置里开磁盘缓存并指定位置——缓存里只有普通 Koofr 文件名和远程路径，不包含密码、令牌或文件内容。切换到"不缓存"、清缓存或者换账户，缓存条目自动删掉。
+文件元数据缓存默认只存在内存里。用户可以在设置里开启磁盘缓存，文件固定放在当前工作目录的 `cache/` 中——缓存里只有普通 Koofr 文件名和远程路径，不包含密码、令牌或文件内容。切换到"不缓存"、清缓存或者换账户，缓存条目自动删掉。
+
+工作目录默认是 Tauri 的 `app_local_data_dir`，也可切换到用户选择的空目录。变更先写入默认数据目录旁的 `net.koofr.desktop.gui.work-directory.json` 定位记录，下次启动会在设置、检查点、历史、缓存和日志初始化前完成迁移。全量迁移使用独立暂存目录和迁移标记，成功激活新目录后才清理旧数据；失败时保留可用副本并在后续启动重试。根目录、符号链接、非空目标和互相嵌套的新旧目录都会被拒绝。Windows 凭据管理器中的应用专用密码不属于工作目录。
 
 用户可选开启 `network_error` 自动恢复，并设置有限或无限的重试次数以及固定重试间隔。单文件下载从已落盘偏移继续，分卷上传从已确认分卷继续，普通上传由于 Koofr 只提供整文件上传接口而从头重试。等待期间仍接受暂停和取消，其他错误类别不会自动重试。
 
 ## Tauri 命令
 
 `connect_koofr`、`restore_saved_login`、`disconnect_koofr`、`koofr_session`、
-`get_settings`、`update_settings`、`update_download_settings`、`update_logging_settings`、`update_transfer_settings`、`clear_metadata_cache`、`clear_logs`、`select_settings_directory`、`forget_saved_login`、`select_upload_file`、
+`get_settings`、`update_settings`、`update_download_settings`、`update_logging_settings`、`update_transfer_settings`、`update_work_directory`、`clear_metadata_cache`、`clear_logs`、`select_work_directory`、`forget_saved_login`、`select_upload_file`、
 `select_download_location`、`select_download_folder`、`select_download_directory`、
 `prepare_download_location`、`prepare_download_folder`、`list_mounts`、
 `list_files`、`list_recent`、`list_shared`、`list_trash`、`restore_trash`、

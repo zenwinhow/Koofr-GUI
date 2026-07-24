@@ -12,8 +12,10 @@ const SETTINGS: AppSettings = {
   savedEmail: null,
   downloadDirectory: 'C:\\Users\\Test\\Downloads',
   askDownloadLocation: true,
-  cacheDirectory: 'C:\\Users\\Test\\AppData\\Cache',
-  logDirectory: 'C:\\Users\\Test\\AppData\\Logs',
+  workDirectory: 'C:\\Users\\Test\\AppData\\Koofr-GUI',
+  pendingWorkDirectory: null,
+  pendingWorkDirectoryMove: false,
+  workDirectoryMigrationFailed: false,
   logLevel: 'info',
   logRetentionDays: 14,
   logMaxFileSizeMb: 10,
@@ -33,12 +35,12 @@ function renderSettings(overrides: Partial<Parameters<typeof SettingsPanel>[0]> 
     downloadError: '',
     onCacheModeChange: vi.fn(),
     onCacheTtlChange: vi.fn(),
-    onCacheDirectoryChange: vi.fn(),
     onLoggingSettingsChange: vi.fn(),
     onTransferSettingsChange: vi.fn(),
     onDownloadSettingsChange: vi.fn(),
     onBrowseDownloadDirectory: vi.fn(async () => null),
-    onBrowseSettingsDirectory: vi.fn(async () => null),
+    onBrowseWorkDirectory: vi.fn(async () => null),
+    onWorkDirectoryChange: vi.fn(),
     onClearCache: vi.fn(),
     onClearLogs: vi.fn(),
     onForgetLogin: vi.fn(),
@@ -85,20 +87,33 @@ describe('SettingsPanel download preferences', () => {
 })
 
 describe('SettingsPanel storage and diagnostics', () => {
-  it('saves a selected cache directory', async () => {
+  it('schedules a selected work directory with a complete migration', async () => {
     const user = userEvent.setup()
-    const onCacheDirectoryChange = vi.fn()
+    const onWorkDirectoryChange = vi.fn()
     renderSettings({
-      onBrowseSettingsDirectory: vi.fn(async (kind) => (
-        kind === 'cache' ? 'D:\\Koofr Cache' : null
-      )),
-      onCacheDirectoryChange,
+      onBrowseWorkDirectory: vi.fn(async () => 'D:\\Koofr Work'),
+      onWorkDirectoryChange,
     })
 
-    await user.click(screen.getByRole('button', { name: '选择缓存文件夹' }))
-    await user.click(screen.getByRole('button', { name: '保存缓存路径' }))
+    await user.click(screen.getByRole('button', { name: '选择应用工作目录' }))
+    await user.click(screen.getByRole('button', { name: '保存工作目录' }))
 
-    expect(onCacheDirectoryChange).toHaveBeenCalledWith('D:\\Koofr Cache')
+    expect(onWorkDirectoryChange).toHaveBeenCalledWith('D:\\Koofr Work', true)
+  })
+
+  it('can leave the previous work directory in place', async () => {
+    const user = userEvent.setup()
+    const onWorkDirectoryChange = vi.fn()
+    renderSettings({
+      onBrowseWorkDirectory: vi.fn(async () => 'D:\\Fresh Koofr Work'),
+      onWorkDirectoryChange,
+    })
+
+    await user.click(screen.getByRole('button', { name: '选择应用工作目录' }))
+    await user.click(screen.getByRole('checkbox', { name: /移动当前工作目录/ }))
+    await user.click(screen.getByRole('button', { name: '保存工作目录' }))
+
+    expect(onWorkDirectoryChange).toHaveBeenCalledWith('D:\\Fresh Koofr Work', false)
   })
 
   it('saves logging location, level, retention and rotation together', async () => {
@@ -112,7 +127,6 @@ describe('SettingsPanel storage and diagnostics', () => {
     await user.click(screen.getByRole('button', { name: '保存日志设置' }))
 
     expect(onLoggingSettingsChange).toHaveBeenCalledWith({
-      logDirectory: 'C:\\Users\\Test\\AppData\\Logs',
       logLevel: 'debug',
       logRetentionDays: 30,
       logMaxFileSizeMb: 25,

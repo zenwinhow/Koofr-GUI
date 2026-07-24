@@ -45,8 +45,10 @@ pub struct SettingsSnapshot {
     saved_email: Option<String>,
     download_directory: String,
     ask_download_location: bool,
-    cache_directory: String,
-    log_directory: String,
+    work_directory: String,
+    pending_work_directory: Option<String>,
+    pending_work_directory_move: bool,
+    work_directory_migration_failed: bool,
     log_level: LogLevel,
     log_retention_days: u32,
     log_max_file_size_mb: u32,
@@ -261,16 +263,11 @@ pub async fn select_download_directory(
 }
 
 #[tauri::command]
-pub async fn select_settings_directory(
+pub async fn select_work_directory(
     app: AppHandle,
     state: State<'_, AppState>,
-    directory_kind: String,
 ) -> CommandResult<Option<String>> {
-    let initial_directory = match directory_kind.as_str() {
-        "cache" => state.settings.cache_directory().await,
-        "logs" => state.settings.log_policy().await.0,
-        _ => return Err(CommandError::from(AppError::InvalidInput("directory kind"))),
-    };
+    let initial_directory = state.work_directory.current_directory();
     let Some(directory) = app
         .dialog()
         .file()
@@ -320,12 +317,12 @@ pub async fn koofr_session(state: State<'_, AppState>) -> CommandResult<SessionI
 async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
     let (cache_mode, cache_ttl_minutes) = state.settings.cache_policy().await;
     let (download_directory, ask_download_location) = state.settings.download_policy().await;
-    let cache_directory = state.settings.cache_directory().await;
-    let (log_directory, log_level, log_retention_days, log_max_file_size_mb) =
+    let (_, log_level, log_retention_days, log_max_file_size_mb) =
         state.settings.log_policy().await;
     let (cached_items, cache_disk_bytes) = state.cache.stats().await;
     let (log_files, log_disk_bytes) = state.logger.stats().await;
     let network_retry = state.settings.network_retry_settings().await;
+    let work_directory = state.work_directory.status();
     SettingsSnapshot {
         cache_mode,
         cache_ttl_minutes,
@@ -334,8 +331,15 @@ async fn settings_snapshot(state: &State<'_, AppState>) -> SettingsSnapshot {
         saved_email: state.settings.remembered_email().await,
         download_directory: download_directory.to_string_lossy().into_owned(),
         ask_download_location,
-        cache_directory: cache_directory.to_string_lossy().into_owned(),
-        log_directory: log_directory.to_string_lossy().into_owned(),
+        work_directory: work_directory
+            .current_directory
+            .to_string_lossy()
+            .into_owned(),
+        pending_work_directory: work_directory
+            .pending_directory
+            .map(|directory| directory.to_string_lossy().into_owned()),
+        pending_work_directory_move: work_directory.move_existing,
+        work_directory_migration_failed: work_directory.migration_failed,
         log_level,
         log_retention_days,
         log_max_file_size_mb,
@@ -357,17 +361,15 @@ pub async fn update_settings(
     state: State<'_, AppState>,
     cache_mode: CacheMode,
     cache_ttl_minutes: u32,
-    cache_directory: String,
 ) -> CommandResult<SettingsSnapshot> {
-    let cache_directory = PathBuf::from(cache_directory.trim());
     state
         .settings
-        .update_cache(cache_mode, cache_ttl_minutes, cache_directory.clone())
+        .update_cache(cache_mode, cache_ttl_minutes)
         .await
         .map_err(CommandError::from)?;
     state
         .cache
-        .relocate(cache_directory.join("metadata-cache.json"), cache_mode)
+        .apply_mode(cache_mode)
         .await
         .map_err(CommandError::from)?;
     state.logger.info(
@@ -382,20 +384,14 @@ pub async fn update_settings(
 #[tauri::command]
 pub async fn update_logging_settings(
     state: State<'_, AppState>,
-    log_directory: String,
     log_level: LogLevel,
     log_retention_days: u32,
     log_max_file_size_mb: u32,
 ) -> CommandResult<SettingsSnapshot> {
-    let log_directory = PathBuf::from(log_directory.trim());
+    let log_directory = state.settings.log_policy().await.0;
     state
         .settings
-        .update_logging(
-            log_directory.clone(),
-            log_level,
-            log_retention_days,
-            log_max_file_size_mb,
-        )
+        .update_logging(log_level, log_retention_days, log_max_file_size_mb)
         .await
         .map_err(CommandError::from)?;
     state
@@ -411,6 +407,25 @@ pub async fn update_logging_settings(
     state.logger.info(
         "settings",
         "logging_settings_updated",
+        None,
+        serde_json::Map::new(),
+    );
+    Ok(settings_snapshot(&state).await)
+}
+
+#[tauri::command]
+pub async fn update_work_directory(
+    state: State<'_, AppState>,
+    work_directory: String,
+    move_existing: bool,
+) -> CommandResult<SettingsSnapshot> {
+    state
+        .work_directory
+        .schedule_change(PathBuf::from(work_directory.trim()), move_existing)
+        .map_err(CommandError::from)?;
+    state.logger.info(
+        "settings",
+        "work_directory_change_scheduled",
         None,
         serde_json::Map::new(),
     );

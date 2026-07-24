@@ -18,6 +18,7 @@ mod transfer;
 mod transfer_commands;
 mod vault_commands;
 mod vault_core;
+mod work_directory;
 
 use credential_manager::CredentialManager;
 use download_history::DownloadHistoryStore;
@@ -29,6 +30,7 @@ use settings::{SettingsDefaults, SettingsStore};
 use tauri::Manager;
 use transfer::{TransferCheckpointStore, TransferManager};
 use vault_core::VaultManager;
+use work_directory::WorkDirectoryStore;
 
 pub struct AppState {
     api: KoofrApi,
@@ -41,6 +43,7 @@ pub struct AppState {
     credentials: CredentialManager,
     logger: AppLogger,
     vault: VaultManager,
+    work_directory: WorkDirectoryStore,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -48,7 +51,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let data_dir = app.path().app_local_data_dir()?;
+            let default_data_dir = app.path().app_local_data_dir()?;
+            let work_directory = WorkDirectoryStore::initialize(default_data_dir)?;
+            let data_dir = work_directory.current_directory();
             let defaults = SettingsDefaults {
                 download_directory: app.path().download_dir()?,
                 cache_directory: data_dir.join("cache"),
@@ -96,6 +101,7 @@ pub fn run() {
                 credentials: CredentialManager::initialize()?,
                 logger,
                 vault,
+                work_directory,
             });
             Ok(())
         })
@@ -109,13 +115,14 @@ pub fn run() {
             commands::update_download_settings,
             commands::update_logging_settings,
             commands::update_transfer_settings,
+            commands::update_work_directory,
             commands::clear_metadata_cache,
             commands::clear_logs,
             commands::forget_saved_login,
             commands::select_upload_file,
             commands::select_download_location,
             commands::select_download_directory,
-            commands::select_settings_directory,
+            commands::select_work_directory,
             commands::prepare_download_location,
             folder_commands::select_download_folder,
             folder_commands::prepare_download_folder,

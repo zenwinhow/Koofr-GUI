@@ -245,12 +245,11 @@ function App() {
   const updateCacheSettings = async (
     cacheMode: CacheMode,
     cacheTtlMinutes: number,
-    cacheDirectory: string,
   ) => {
     setSettingsBusy(true)
     setSettingsError('')
     try {
-      setSettings(await koofr.updateSettings(cacheMode, cacheTtlMinutes, cacheDirectory))
+      setSettings(await koofr.updateSettings(cacheMode, cacheTtlMinutes))
     } catch (error) {
       setSettingsError(commandErrorMessage(error, '无法保存缓存设置。'))
     } finally {
@@ -259,7 +258,6 @@ function App() {
   }
 
   const updateLoggingSettings = async (
-    logDirectory: string,
     logLevel: LogLevel,
     logRetentionDays: number,
     logMaxFileSizeMb: number,
@@ -268,14 +266,13 @@ function App() {
     setSettingsError('')
     try {
       setSettings(await koofr.updateLoggingSettings(
-        logDirectory,
         logLevel,
         logRetentionDays,
         logMaxFileSizeMb,
       ))
       showNotice('日志设置已保存')
     } catch (error) {
-      setSettingsError(commandErrorMessage(error, '无法保存日志设置，请检查文件夹路径和参数。'))
+      setSettingsError(commandErrorMessage(error, '无法保存日志设置，请检查参数。'))
     } finally {
       setSettingsBusy(false)
     }
@@ -302,13 +299,29 @@ function App() {
     }
   }
 
-  const browseSettingsDirectory = async (kind: 'cache' | 'logs') => {
+  const browseWorkDirectory = async () => {
     setSettingsError('')
     try {
-      return await koofr.selectSettingsDirectory(kind)
+      return await koofr.selectWorkDirectory()
     } catch (error) {
       setSettingsError(commandErrorMessage(error, '无法打开文件夹选择器。'))
       return null
+    }
+  }
+
+  const updateWorkDirectory = async (workDirectory: string, moveExisting: boolean) => {
+    setSettingsBusy(true)
+    setSettingsError('')
+    try {
+      setSettings(await koofr.updateWorkDirectory(workDirectory, moveExisting))
+      showNotice('工作目录更改已保存，将在下次启动时应用')
+    } catch (error) {
+      setSettingsError(commandErrorMessage(
+        error,
+        '无法更改工作目录。请选择一个空的、独立的本地文件夹。',
+      ))
+    } finally {
+      setSettingsBusy(false)
     }
   }
 
@@ -1113,25 +1126,15 @@ function App() {
               if (settings) void updateCacheSettings(
                 cacheMode,
                 settings.cacheTtlMinutes,
-                settings.cacheDirectory,
               )
             }}
             onCacheTtlChange={(cacheTtlMinutes) => {
               if (settings) void updateCacheSettings(
                 settings.cacheMode,
                 cacheTtlMinutes,
-                settings.cacheDirectory,
-              )
-            }}
-            onCacheDirectoryChange={(cacheDirectory) => {
-              if (settings) void updateCacheSettings(
-                settings.cacheMode,
-                settings.cacheTtlMinutes,
-                cacheDirectory,
               )
             }}
             onLoggingSettingsChange={(next) => void updateLoggingSettings(
-              next.logDirectory,
               next.logLevel,
               next.logRetentionDays,
               next.logMaxFileSizeMb,
@@ -1145,7 +1148,10 @@ function App() {
               void updateDownloadSettings(directory, askDownloadLocation)
             }}
             onBrowseDownloadDirectory={browseSettingsDownloadDirectory}
-            onBrowseSettingsDirectory={browseSettingsDirectory}
+            onBrowseWorkDirectory={browseWorkDirectory}
+            onWorkDirectoryChange={(directory, moveExisting) => {
+              void updateWorkDirectory(directory, moveExisting)
+            }}
             onClearCache={() => void clearMetadataCache()}
             onClearLogs={() => void clearLogs()}
             onForgetLogin={() => void forgetSavedLogin()}

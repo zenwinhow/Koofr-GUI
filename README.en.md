@@ -80,7 +80,8 @@ Koofr-GUI aims to fill that gap: a small, native-feeling desktop client with res
 
 - **Settings**
   - Configurable default download folder, optional "ask each time" per-download prompt.
-  - Metadata cache: memory / disk / off.
+  - Configurable application work directory, with an optional complete migration of settings, transfer state, download history, cache, and logs before the next start.
+  - Metadata cache: memory / disk / off. Diagnostic log level, retention, rotation size, usage, and cleanup remain configurable.
   - Optional automatic retry for transfers that fail with `network_error`, with a configurable fixed interval and either a finite or unlimited retry count.
   - Five themes (koofr / ocean / iris / coral / berry) — accent tokens only.
 
@@ -190,18 +191,20 @@ Full design and data flow in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Where data is stored
 
-App data lives under the current Windows user's local data directory (`identifier = net.koofr.desktop.gui`):
+App data defaults to the current Windows user's local data directory (`identifier = net.koofr.desktop.gui`) and can be changed to an existing empty directory:
 
 ```
-%LOCALAPPDATA%\net.koofr.desktop.gui\
+<application work directory>\
 ├─ settings.json                # app settings
 ├─ transfer-checkpoints.json    # resumable transfer checkpoints
 ├─ download-history.json        # account-scoped download history, locations, and bounded speed samples
-├─ cache/metadata-cache.json    # default disk cache location (configurable)
-└─ logs/koofr-gui*.jsonl       # redacted diagnostic logs (configurable)
+├─ cache/metadata-cache.json    # disk metadata cache
+└─ logs/koofr-gui*.jsonl       # redacted diagnostic logs
 ```
 
-**Credentials are NOT here** — the Koofr app-specific password is stored in the Windows Credential Manager and survives reinstalls and rebuilds.
+The default work directory is `%LOCALAPPDATA%\net.koofr.desktop.gui`. A small adjacent `%LOCALAPPDATA%\net.koofr.desktop.gui.work-directory.json` locator lets the application find a custom directory after restart; this locator is not moved with the work data. A complete migration runs before any work file is opened on the next start, supports cross-volume copies, and removes the old data only after activation succeeds. The destination must be empty; a failed migration keeps a usable copy and is retried on the next start.
+
+**Credentials are NOT in the work directory** — the Koofr app-specific password is stored in the Windows Credential Manager, survives reinstalls and rebuilds, and is not part of work-directory migration.
 
 ## Roadmap
 
