@@ -78,22 +78,19 @@ export const koofr = {
     return invoke<AppSettings>('get_settings')
   },
 
-  updateSettings(cacheMode: CacheMode, cacheTtlMinutes: number, cacheDirectory: string) {
+  updateSettings(cacheMode: CacheMode, cacheTtlMinutes: number) {
     return invoke<AppSettings>('update_settings', {
       cacheMode,
       cacheTtlMinutes,
-      cacheDirectory,
     })
   },
 
   updateLoggingSettings(
-    logDirectory: string,
     logLevel: LogLevel,
     logRetentionDays: number,
     logMaxFileSizeMb: number,
   ) {
     return invoke<AppSettings>('update_logging_settings', {
-      logDirectory,
       logLevel,
       logRetentionDays,
       logMaxFileSizeMb,
@@ -116,6 +113,13 @@ export const koofr = {
     return invoke<AppSettings>('update_download_settings', {
       downloadDirectory,
       askDownloadLocation,
+    })
+  },
+
+  updateWorkDirectory(workDirectory: string, moveExisting: boolean) {
+    return invoke<AppSettings>('update_work_directory', {
+      workDirectory,
+      moveExisting,
     })
   },
 
@@ -181,8 +185,8 @@ export const koofr = {
     return invoke<string | null>('select_download_directory')
   },
 
-  selectSettingsDirectory(directoryKind: 'cache' | 'logs') {
-    return invoke<string | null>('select_settings_directory', { directoryKind })
+  selectWorkDirectory() {
+    return invoke<string | null>('select_work_directory')
   },
 
   prepareDownloadLocation(suggestedName: string, downloadDirectory: string) {

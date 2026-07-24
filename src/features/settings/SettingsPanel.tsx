@@ -23,9 +23,7 @@ interface SettingsPanelProps {
   readonly downloadError: string
   readonly onCacheModeChange: (mode: CacheMode) => void
   readonly onCacheTtlChange: (minutes: number) => void
-  readonly onCacheDirectoryChange: (directory: string) => void
   readonly onLoggingSettingsChange: (settings: {
-    logDirectory: string
     logLevel: LogLevel
     logRetentionDays: number
     logMaxFileSizeMb: number
@@ -37,7 +35,8 @@ interface SettingsPanelProps {
   }) => void
   readonly onDownloadSettingsChange: (directory: string, askDownloadLocation: boolean) => void
   readonly onBrowseDownloadDirectory: () => Promise<string | null>
-  readonly onBrowseSettingsDirectory: (kind: 'cache' | 'logs') => Promise<string | null>
+  readonly onBrowseWorkDirectory: () => Promise<string | null>
+  readonly onWorkDirectoryChange: (directory: string, moveExisting: boolean) => void
   readonly onClearCache: () => void
   readonly onClearLogs: () => void
   readonly onForgetLogin: () => void
@@ -77,29 +76,31 @@ export function SettingsPanel({
   downloadError,
   onCacheModeChange,
   onCacheTtlChange,
-  onCacheDirectoryChange,
   onLoggingSettingsChange,
   onTransferSettingsChange,
   onDownloadSettingsChange,
   onBrowseDownloadDirectory,
-  onBrowseSettingsDirectory,
+  onBrowseWorkDirectory,
+  onWorkDirectoryChange,
   onClearCache,
   onClearLogs,
   onForgetLogin,
 }: SettingsPanelProps) {
   const [downloadDirectory, setDownloadDirectory] = useState(settings?.downloadDirectory ?? '')
-  const [cacheDirectory, setCacheDirectory] = useState(settings?.cacheDirectory ?? '')
-  const [logDirectory, setLogDirectory] = useState(settings?.logDirectory ?? '')
+  const [workDirectory, setWorkDirectory] = useState(
+    settings?.pendingWorkDirectory ?? settings?.workDirectory ?? '',
+  )
+  const [moveExisting, setMoveExisting] = useState(settings?.pendingWorkDirectoryMove ?? true)
   const [logLevel, setLogLevel] = useState<LogLevel>(settings?.logLevel ?? 'info')
   const [logRetentionDays, setLogRetentionDays] = useState(settings?.logRetentionDays ?? 14)
   const [logMaxFileSizeMb, setLogMaxFileSizeMb] = useState(settings?.logMaxFileSizeMb ?? 10)
-  const [browsing, setBrowsing] = useState<'download' | 'cache' | 'logs' | null>(null)
+  const [browsing, setBrowsing] = useState<'download' | 'work' | null>(null)
 
   useEffect(() => {
     if (!settings) return
     setDownloadDirectory(settings.downloadDirectory)
-    setCacheDirectory(settings.cacheDirectory)
-    setLogDirectory(settings.logDirectory)
+    setWorkDirectory(settings.pendingWorkDirectory ?? settings.workDirectory)
+    setMoveExisting(settings.pendingWorkDirectoryMove || settings.pendingWorkDirectory === null)
     setLogLevel(settings.logLevel)
     setLogRetentionDays(settings.logRetentionDays)
     setLogMaxFileSizeMb(settings.logMaxFileSizeMb)
@@ -110,12 +111,15 @@ export function SettingsPanel({
   }
 
   const normalizedDownloadDirectory = downloadDirectory.trim()
-  const normalizedCacheDirectory = cacheDirectory.trim()
-  const normalizedLogDirectory = logDirectory.trim()
+  const normalizedWorkDirectory = workDirectory.trim()
   const downloadDirectoryChanged = normalizedDownloadDirectory !== settings.downloadDirectory
-  const cacheDirectoryChanged = normalizedCacheDirectory !== settings.cacheDirectory
-  const loggingChanged = normalizedLogDirectory !== settings.logDirectory
-    || logLevel !== settings.logLevel
+  const configuredWorkDirectory = settings.pendingWorkDirectory ?? settings.workDirectory
+  const workDirectoryChanged = normalizedWorkDirectory !== configuredWorkDirectory
+    || (
+      settings.pendingWorkDirectory !== null
+      && moveExisting !== settings.pendingWorkDirectoryMove
+    )
+  const loggingChanged = logLevel !== settings.logLevel
     || logRetentionDays !== settings.logRetentionDays
     || logMaxFileSizeMb !== settings.logMaxFileSizeMb
   const browseDownloadDirectory = async () => {
@@ -130,14 +134,11 @@ export function SettingsPanel({
       setBrowsing(null)
     }
   }
-  const browseStorageDirectory = async (kind: 'cache' | 'logs') => {
-    setBrowsing(kind)
+  const browseWorkDirectory = async () => {
+    setBrowsing('work')
     try {
-      const selected = await onBrowseSettingsDirectory(kind)
-      if (selected) {
-        if (kind === 'cache') setCacheDirectory(selected)
-        else setLogDirectory(selected)
-      }
+      const selected = await onBrowseWorkDirectory()
+      if (selected) setWorkDirectory(selected)
     } finally {
       setBrowsing(null)
     }
@@ -306,6 +307,75 @@ export function SettingsPanel({
 
       <section className="settings-section">
         <header className="settings-section__heading">
+          <HardDrive aria-hidden="true" />
+          <div>
+            <h3>应用工作目录</h3>
+            <p>统一保存设置、传输检查点、下载历史、磁盘缓存和诊断日志。</p>
+          </div>
+        </header>
+
+        <div className="settings-path-field">
+          <label htmlFor="settings-work-directory">工作配置目录</label>
+          <span className="path-field__control">
+            <input
+              id="settings-work-directory"
+              value={workDirectory}
+              disabled={busy}
+              onChange={(event) => setWorkDirectory(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && normalizedWorkDirectory && workDirectoryChanged) {
+                  onWorkDirectoryChange(normalizedWorkDirectory, moveExisting)
+                }
+              }}
+            />
+            <button
+              type="button"
+              aria-label="选择应用工作目录"
+              title="选择文件夹"
+              disabled={busy || browsing !== null}
+              onClick={() => void browseWorkDirectory()}
+            >
+              <FolderOpen aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+
+        <label className="settings-migration-option">
+          <input
+            type="checkbox"
+            checked={moveExisting}
+            disabled={busy}
+            onChange={(event) => setMoveExisting(event.target.checked)}
+          />
+          <span>
+            <strong>移动当前工作目录中的全部文件</strong>
+            <small>取消勾选会从空目录开始，原目录及其中的数据保持不变。</small>
+          </span>
+        </label>
+
+        {settings.pendingWorkDirectory ? (
+          <p className={`settings-note${settings.workDirectoryMigrationFailed ? ' settings-note--error' : ''}`}>
+            {settings.workDirectoryMigrationFailed
+              ? '上次迁移未完成；应用仍保留可用数据，并会在下次启动时重试。'
+              : '目录更改已安排，将在下次启动、打开任何工作文件之前应用。'}
+          </p>
+        ) : null}
+
+        <div className="settings-path-actions">
+          <small>目标必须是空的本地文件夹，且不能位于当前工作目录内部或外层。</small>
+          <button
+            type="button"
+            aria-label="保存工作目录"
+            disabled={busy || !workDirectoryChanged || !normalizedWorkDirectory}
+            onClick={() => onWorkDirectoryChange(normalizedWorkDirectory, moveExisting)}
+          >
+            保存并在重启后应用
+          </button>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <header className="settings-section__heading">
           <Database aria-hidden="true" />
           <div>
             <h3>文件信息缓存</h3>
@@ -357,43 +427,6 @@ export function SettingsPanel({
           </select>
         </div>
 
-        <div className="settings-path-field settings-path-field--spaced">
-          <label htmlFor="settings-cache-directory">缓存文件夹</label>
-          <span className="path-field__control">
-            <input
-              id="settings-cache-directory"
-              value={cacheDirectory}
-              disabled={busy}
-              onChange={(event) => setCacheDirectory(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && normalizedCacheDirectory) {
-                  onCacheDirectoryChange(normalizedCacheDirectory)
-                }
-              }}
-            />
-            <button
-              type="button"
-              aria-label="选择缓存文件夹"
-              title="选择文件夹"
-              disabled={busy || browsing !== null}
-              onClick={() => void browseStorageDirectory('cache')}
-            >
-              <FolderOpen aria-hidden="true" />
-            </button>
-          </span>
-        </div>
-        <div className="settings-path-actions">
-          <small>仅磁盘模式会写入这里；切换位置时会安全迁移当前缓存。</small>
-          <button
-            type="button"
-            aria-label="保存缓存路径"
-            disabled={busy || !cacheDirectoryChanged || !normalizedCacheDirectory}
-            onClick={() => onCacheDirectoryChange(normalizedCacheDirectory)}
-          >
-            保存路径
-          </button>
-        </div>
-
         <div className="settings-storage">
           <span>当前缓存 {settings.cachedItems} 项</span>
           <span>磁盘占用 {formatBytes(settings.cacheDiskBytes)}</span>
@@ -411,27 +444,6 @@ export function SettingsPanel({
             <p>用于定位上传、下载和网络错误；不会记录令牌、邮箱、文件名或完整路径。</p>
           </div>
         </header>
-
-        <div className="settings-path-field">
-          <label htmlFor="settings-log-directory">日志文件夹</label>
-          <span className="path-field__control">
-            <input
-              id="settings-log-directory"
-              value={logDirectory}
-              disabled={busy}
-              onChange={(event) => setLogDirectory(event.target.value)}
-            />
-            <button
-              type="button"
-              aria-label="选择日志文件夹"
-              title="选择文件夹"
-              disabled={busy || browsing !== null}
-              onClick={() => void browseStorageDirectory('logs')}
-            >
-              <FolderOpen aria-hidden="true" />
-            </button>
-          </span>
-        </div>
 
         <div className="settings-row settings-row--compact-grid">
           <label htmlFor="settings-log-level">
@@ -491,9 +503,8 @@ export function SettingsPanel({
           <span>磁盘占用 {formatBytes(settings.logDiskBytes)}</span>
           <button
             type="button"
-            disabled={busy || !loggingChanged || !normalizedLogDirectory}
+            disabled={busy || !loggingChanged}
             onClick={() => onLoggingSettingsChange({
-              logDirectory: normalizedLogDirectory,
               logLevel,
               logRetentionDays,
               logMaxFileSizeMb,

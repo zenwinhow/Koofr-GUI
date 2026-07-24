@@ -48,8 +48,10 @@ export interface AppSettings {
   readonly savedEmail: string | null
   readonly downloadDirectory: string
   readonly askDownloadLocation: boolean
-  readonly cacheDirectory: string
-  readonly logDirectory: string
+  readonly workDirectory: string
+  readonly pendingWorkDirectory: string | null
+  readonly pendingWorkDirectoryMove: boolean
+  readonly workDirectoryMigrationFailed: boolean
   readonly logLevel: LogLevel
   readonly logRetentionDays: number
   readonly logMaxFileSizeMb: number

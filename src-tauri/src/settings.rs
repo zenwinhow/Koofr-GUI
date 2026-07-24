@@ -52,10 +52,6 @@ struct StoredSettings {
     #[serde(default = "default_ask_download_location")]
     ask_download_location: bool,
     #[serde(default)]
-    cache_directory: Option<PathBuf>,
-    #[serde(default)]
-    log_directory: Option<PathBuf>,
-    #[serde(default)]
     log_level: LogLevel,
     #[serde(default = "default_log_retention_days")]
     log_retention_days: u32,
@@ -98,8 +94,6 @@ impl Default for StoredSettings {
             remembered_email: None,
             download_directory: None,
             ask_download_location: default_ask_download_location(),
-            cache_directory: None,
-            log_directory: None,
             log_level: LogLevel::Info,
             log_retention_days: default_log_retention_days(),
             log_max_file_size_mb: default_log_max_file_size_mb(),
@@ -128,20 +122,6 @@ impl SettingsStore {
             .filter(|settings| settings.version == SETTINGS_VERSION)
             .unwrap_or_default();
         if state
-            .cache_directory
-            .as_deref()
-            .is_some_and(|directory| !is_existing_safe_directory(directory))
-        {
-            state.cache_directory = None;
-        }
-        if state
-            .log_directory
-            .as_deref()
-            .is_some_and(|directory| !is_existing_safe_directory(directory))
-        {
-            state.log_directory = None;
-        }
-        if state
             .network_retry_limit
             .is_some_and(|limit| !(1..=10_000).contains(&limit))
         {
@@ -150,15 +130,9 @@ impl SettingsStore {
         if !(1..=3_600).contains(&state.network_retry_interval_seconds) {
             state.network_retry_interval_seconds = default_network_retry_interval_seconds();
         }
-        let initial_cache_directory = state
-            .cache_directory
-            .clone()
-            .unwrap_or_else(|| defaults.cache_directory.clone());
+        let initial_cache_directory = defaults.cache_directory.clone();
         let initial_log_config = (
-            state
-                .log_directory
-                .clone()
-                .unwrap_or_else(|| defaults.log_directory.clone()),
+            defaults.log_directory.clone(),
             state.log_level,
             state.log_retention_days,
             state.log_max_file_size_mb,
@@ -205,22 +179,10 @@ impl SettingsStore {
         )
     }
 
-    pub async fn cache_directory(&self) -> PathBuf {
-        self.state
-            .read()
-            .await
-            .cache_directory
-            .clone()
-            .unwrap_or_else(|| self.defaults.cache_directory.clone())
-    }
-
     pub async fn log_policy(&self) -> (PathBuf, LogLevel, u32, u32) {
         let state = self.state.read().await;
         (
-            state
-                .log_directory
-                .clone()
-                .unwrap_or_else(|| self.defaults.log_directory.clone()),
+            self.defaults.log_directory.clone(),
             state.log_level,
             state.log_retention_days,
             state.log_max_file_size_mb,
@@ -240,29 +202,24 @@ impl SettingsStore {
         &self,
         cache_mode: CacheMode,
         cache_ttl_minutes: u32,
-        cache_directory: PathBuf,
     ) -> Result<(), AppError> {
         if !(1..=1440).contains(&cache_ttl_minutes) {
             return Err(AppError::InvalidInput("cache_ttl_minutes"));
         }
-        validate_existing_directory(&cache_directory, "cache directory").await?;
         {
             let mut state = self.state.write().await;
             state.cache_mode = cache_mode;
             state.cache_ttl_minutes = cache_ttl_minutes;
-            state.cache_directory = Some(cache_directory);
         }
         self.persist().await
     }
 
     pub async fn update_logging(
         &self,
-        log_directory: PathBuf,
         log_level: LogLevel,
         log_retention_days: u32,
         log_max_file_size_mb: u32,
     ) -> Result<(), AppError> {
-        validate_existing_directory(&log_directory, "log directory").await?;
         if !(1..=365).contains(&log_retention_days) {
             return Err(AppError::InvalidInput("log retention days"));
         }
@@ -271,7 +228,6 @@ impl SettingsStore {
         }
         {
             let mut state = self.state.write().await;
-            state.log_directory = Some(log_directory);
             state.log_level = log_level;
             state.log_retention_days = log_retention_days;
             state.log_max_file_size_mb = log_max_file_size_mb;
@@ -347,26 +303,6 @@ impl SettingsStore {
     }
 }
 
-async fn validate_existing_directory(
-    directory: &std::path::Path,
-    field: &'static str,
-) -> Result<(), AppError> {
-    if !directory.is_absolute() {
-        return Err(AppError::InvalidInput(field));
-    }
-    let metadata = tokio::fs::symlink_metadata(directory).await?;
-    if !metadata.is_dir() || metadata.file_type().is_symlink() {
-        return Err(AppError::InvalidInput(field));
-    }
-    Ok(())
-}
-
-fn is_existing_safe_directory(directory: &std::path::Path) -> bool {
-    directory.is_absolute()
-        && std::fs::symlink_metadata(directory)
-            .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
-}
-
 #[cfg(test)]
 mod tests {
     use super::{CacheMode, SettingsDefaults, SettingsStore};
@@ -390,7 +326,7 @@ mod tests {
         let store = SettingsStore::load(path.clone(), defaults(&directory));
 
         store
-            .update_cache(CacheMode::Disk, 60, directory.join("Cache"))
+            .update_cache(CacheMode::Disk, 60)
             .await
             .expect("update cache settings");
         store
@@ -489,6 +425,31 @@ mod tests {
         assert!(retry.enabled);
         assert_eq!(retry.max_retries, None);
         assert_eq!(retry.interval_seconds, 30);
+        std::fs::remove_dir_all(directory).expect("remove settings directory");
+    }
+
+    #[tokio::test]
+    async fn ignores_legacy_standalone_cache_and_log_directories() {
+        let directory =
+            std::env::temp_dir().join(format!("koofr-settings-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).expect("create settings directory");
+        let path = directory.join("settings.json");
+        std::fs::write(
+            &path,
+            br#"{
+                "version": 1,
+                "cacheMode": "memory",
+                "cacheTtlMinutes": 15,
+                "rememberedEmail": null,
+                "cacheDirectory": "D:\\Legacy Cache",
+                "logDirectory": "D:\\Legacy Logs"
+            }"#,
+        )
+        .expect("write legacy settings");
+        let store = SettingsStore::load(path, defaults(&directory));
+
+        assert_eq!(store.initial_cache_directory(), &directory.join("Cache"));
+        assert_eq!(store.log_policy().await.0, directory.join("Logs"));
         std::fs::remove_dir_all(directory).expect("remove settings directory");
     }
 }

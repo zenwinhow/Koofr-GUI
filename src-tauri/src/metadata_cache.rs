@@ -163,26 +163,6 @@ impl MetadataCache {
         (entries, bytes)
     }
 
-    pub async fn relocate(&self, path: PathBuf, mode: CacheMode) -> Result<(), AppError> {
-        let current = self.path.read().await.clone();
-        if current == path {
-            return self.apply_mode(mode).await;
-        }
-        let parent = path.parent().ok_or(AppError::LocalData)?;
-        let metadata = tokio::fs::symlink_metadata(parent).await?;
-        if !path.is_absolute() || !metadata.is_dir() || metadata.file_type().is_symlink() {
-            return Err(AppError::InvalidInput("cache directory"));
-        }
-        *self.path.write().await = path;
-        self.apply_mode(mode).await?;
-        if tokio::fs::try_exists(&current).await.unwrap_or(false) {
-            tokio::fs::remove_file(current)
-                .await
-                .map_err(|_| AppError::LocalData)?;
-        }
-        Ok(())
-    }
-
     async fn persist(&self) -> Result<(), AppError> {
         let payload =
             serde_json::to_vec(&*self.state.read().await).map_err(|_| AppError::LocalData)?;
@@ -272,31 +252,5 @@ mod tests {
         );
 
         std::fs::remove_dir_all(directory).expect("remove cache directory");
-    }
-
-    #[tokio::test]
-    async fn relocates_the_disk_cache_and_removes_the_old_file() {
-        let directory = std::env::temp_dir().join(format!("koofr-cache-{}", uuid::Uuid::new_v4()));
-        let old_directory = directory.join("old");
-        let new_directory = directory.join("new");
-        std::fs::create_dir_all(&old_directory).expect("create old cache directory");
-        std::fs::create_dir_all(&new_directory).expect("create new cache directory");
-        let old_path = old_directory.join("metadata-cache.json");
-        let new_path = new_directory.join("metadata-cache.json");
-        let cache = MetadataCache::load(old_path.clone(), false);
-        cache
-            .put("files:/".to_owned(), &vec!["one"], CacheMode::Disk)
-            .await
-            .expect("write old cache");
-
-        cache
-            .relocate(new_path.clone(), CacheMode::Disk)
-            .await
-            .expect("relocate cache");
-
-        assert!(!old_path.exists());
-        assert!(new_path.is_file());
-        assert_eq!(cache.stats().await.0, 1);
-        std::fs::remove_dir_all(directory).expect("remove cache directories");
     }
 }
